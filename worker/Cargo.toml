@@ -7,3 +7,7 @@ edition = "2021"
 
 [dependencies]
 sysinfo = "0.28.4"
+tonic = { version = "0.9.2", features = ["tls", "prost"] }
+tokio = { version = "1.27.0", features = ["full"] }
+pcap = "1.0.0"
+local-ip-address = "0.5.1"
