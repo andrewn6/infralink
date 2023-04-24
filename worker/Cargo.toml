@@ -9,16 +9,10 @@ edition = "2021"
 tonic = "0.8.3"
 prost = "0.11.8"
 tokio = { version = "1.18", features = ["macros", "rt-multi-thread"] }
-<<<<<<< HEAD
-tonic-build = "0.8.4"
-sysinfo = "0.28.1"
-tonic-reflection = "0.6.0"
-=======
 tonic-build = "0.9.2"
 sysinfo = "0.28.4"
 pcap = "1.0.0"
 local-ip-address = "0.5.1"
->>>>>>> 2178e817175c80b3c8cbea5e22a614693f426948
 
 [build-dependencies]
 tonic-build = "0.9.2"
