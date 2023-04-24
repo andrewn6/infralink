@@ -112,9 +112,6 @@ async fn bandwidth_listener() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    bandwidth_listener().await;
-
-
     let addr = "[::1]:50051".parse().unwrap();
     let bookstore = BookStoreImpl::default();
 
