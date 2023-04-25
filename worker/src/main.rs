@@ -13,12 +13,24 @@ use memory::{
     memory_service_server::{MemoryService, MemoryServiceServer},
 };
 
+use compute::{
+    ComputeMetadata,
+    compute_service_server::{ComputeService, ComputeServiceServer},
+};
+
+mod compute {
+    include!("compute.rs");
+}
+
 mod memory {
     include!("memory.rs");
 
     pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
         tonic::include_file_descriptor_set!("greeter_descriptor");
 }
+
+#[derive(Default)]
+pub struct ComputeServiceImpl {}
 
 #[derive(Default)]
 pub struct MemoryServiceImpl {}
@@ -37,6 +49,20 @@ impl MemoryService for MemoryServiceImpl {
             }),
             swaps: None,
         };
+
+        Ok(Response::new(metadata))
+    }
+}
+
+#[tonic::async_trait]
+impl ComputeService for ComputeServiceImpl {
+    async fn get_compute_metadata (
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<ComputeMetadata>, Status> {
+        //let metadata = ComputeMetadata {
+            // add metadata stuff later
+        //};
 
         Ok(Response::new(metadata))
     }
@@ -119,18 +145,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let memory_service = MemoryServiceImpl::default();
     let server = MemoryServiceServer::new(memory_service);
     
-    /*  
+    
     let reflection_service = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(memory::FILE_DESCRIPTOR_SET)
         .build()
         .unwrap();
-    */
+    
 
     println!("gRPC server listening on {}", addr);
 
     Server::builder()
         .add_service(server)
-        /*  .add_service(reflection_service) uncomment this if you want reflection */
+        .add_service(reflection_service)
         .serve(addr)
         .await?;
 
