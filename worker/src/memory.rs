@@ -1,34 +1,31 @@
-/// The request with a id of the book
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetBookRequest {
-    #[prost(string, tag = "1")]
-    pub id: ::prost::alloc::string::String,
+pub struct MemoryMetadata {
+    #[prost(message, optional, tag = "1")]
+    pub primary: ::core::option::Option<Memory>,
+    #[prost(message, optional, tag = "2")]
+    pub swaps: ::core::option::Option<Memory>,
 }
-/// The response details of a book
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetBookResponse {
-    #[prost(string, tag = "1")]
-    pub id: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub name: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub author: ::prost::alloc::string::String,
-    #[prost(int32, tag = "4")]
-    pub year: i32,
+pub struct Memory {
+    #[prost(uint64, tag = "1")]
+    pub total: u64,
+    #[prost(uint64, tag = "2")]
+    pub used: u64,
+    #[prost(uint64, tag = "3")]
+    pub free: u64,
 }
 /// Generated client implementations.
-pub mod bookstore_client {
+pub mod memory_service_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
-    /// The book store service definition.
     #[derive(Debug, Clone)]
-    pub struct BookstoreClient<T> {
+    pub struct MemoryServiceClient<T> {
         inner: tonic::client::Grpc<T>,
     }
-    impl BookstoreClient<tonic::transport::Channel> {
+    impl MemoryServiceClient<tonic::transport::Channel> {
         /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
@@ -39,7 +36,7 @@ pub mod bookstore_client {
             Ok(Self::new(conn))
         }
     }
-    impl<T> BookstoreClient<T>
+    impl<T> MemoryServiceClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
@@ -57,7 +54,7 @@ pub mod bookstore_client {
         pub fn with_interceptor<F>(
             inner: T,
             interceptor: F,
-        ) -> BookstoreClient<InterceptedService<T, F>>
+        ) -> MemoryServiceClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
@@ -71,7 +68,7 @@ pub mod bookstore_client {
                 http::Request<tonic::body::BoxBody>,
             >>::Error: Into<StdError> + Send + Sync,
         {
-            BookstoreClient::new(InterceptedService::new(inner, interceptor))
+            MemoryServiceClient::new(InterceptedService::new(inner, interceptor))
         }
         /// Compress requests with the given encoding.
         ///
@@ -88,11 +85,10 @@ pub mod bookstore_client {
             self.inner = self.inner.accept_compressed(encoding);
             self
         }
-        /// Retrieve a book
-        pub async fn get_book(
+        pub async fn get_memory_metadata(
             &mut self,
-            request: impl tonic::IntoRequest<super::GetBookRequest>,
-        ) -> Result<tonic::Response<super::GetBookResponse>, tonic::Status> {
+            request: impl tonic::IntoRequest<()>,
+        ) -> Result<tonic::Response<super::MemoryMetadata>, tonic::Status> {
             self.inner
                 .ready()
                 .await
@@ -104,34 +100,32 @@ pub mod bookstore_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/bookstore.Bookstore/GetBook",
+                "/memory.MemoryService/GetMemoryMetadata",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }
 /// Generated server implementations.
-pub mod bookstore_server {
+pub mod memory_service_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with BookstoreServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with MemoryServiceServer.
     #[async_trait]
-    pub trait Bookstore: Send + Sync + 'static {
-        /// Retrieve a book
-        async fn get_book(
+    pub trait MemoryService: Send + Sync + 'static {
+        async fn get_memory_metadata(
             &self,
-            request: tonic::Request<super::GetBookRequest>,
-        ) -> Result<tonic::Response<super::GetBookResponse>, tonic::Status>;
+            request: tonic::Request<()>,
+        ) -> Result<tonic::Response<super::MemoryMetadata>, tonic::Status>;
     }
-    /// The book store service definition.
     #[derive(Debug)]
-    pub struct BookstoreServer<T: Bookstore> {
+    pub struct MemoryServiceServer<T: MemoryService> {
         inner: _Inner<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
     }
     struct _Inner<T>(Arc<T>);
-    impl<T: Bookstore> BookstoreServer<T> {
+    impl<T: MemoryService> MemoryServiceServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -165,9 +159,9 @@ pub mod bookstore_server {
             self
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for BookstoreServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for MemoryServiceServer<T>
     where
-        T: Bookstore,
+        T: MemoryService,
         B: Body + Send + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
@@ -183,22 +177,21 @@ pub mod bookstore_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/bookstore.Bookstore/GetBook" => {
+                "/memory.MemoryService/GetMemoryMetadata" => {
                     #[allow(non_camel_case_types)]
-                    struct GetBookSvc<T: Bookstore>(pub Arc<T>);
-                    impl<T: Bookstore> tonic::server::UnaryService<super::GetBookRequest>
-                    for GetBookSvc<T> {
-                        type Response = super::GetBookResponse;
+                    struct GetMemoryMetadataSvc<T: MemoryService>(pub Arc<T>);
+                    impl<T: MemoryService> tonic::server::UnaryService<()>
+                    for GetMemoryMetadataSvc<T> {
+                        type Response = super::MemoryMetadata;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::GetBookRequest>,
-                        ) -> Self::Future {
+                        fn call(&mut self, request: tonic::Request<()>) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).get_book(request).await };
+                            let fut = async move {
+                                (*inner).get_memory_metadata(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -207,7 +200,7 @@ pub mod bookstore_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = GetBookSvc(inner);
+                        let method = GetMemoryMetadataSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -234,7 +227,7 @@ pub mod bookstore_server {
             }
         }
     }
-    impl<T: Bookstore> Clone for BookstoreServer<T> {
+    impl<T: MemoryService> Clone for MemoryServiceServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -244,7 +237,7 @@ pub mod bookstore_server {
             }
         }
     }
-    impl<T: Bookstore> Clone for _Inner<T> {
+    impl<T: MemoryService> Clone for _Inner<T> {
         fn clone(&self) -> Self {
             Self(self.0.clone())
         }
@@ -254,7 +247,7 @@ pub mod bookstore_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: Bookstore> tonic::server::NamedService for BookstoreServer<T> {
-        const NAME: &'static str = "bookstore.Bookstore";
+    impl<T: MemoryService> tonic::server::NamedService for MemoryServiceServer<T> {
+        const NAME: &'static str = "memory.MemoryService";
     }
 }

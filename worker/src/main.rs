@@ -8,34 +8,37 @@ use std::time::Duration;
 use tokio::task;
 use tokio::time::sleep;
 
-use bookstore::bookstore_server::{Bookstore, BookstoreServer};
-use bookstore::{GetBookRequest, GetBookResponse};
+use memory::{
+    MemoryMetadata,
+    memory_service_server::{MemoryService, MemoryServiceServer},
+};
 
-mod bookstore {
-    include!("bookstore.rs");
+mod memory {
+    include!("memory.rs");
 
     pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
         tonic::include_file_descriptor_set!("greeter_descriptor");
 }
 
 #[derive(Default)]
-pub struct BookStoreImpl {}
+pub struct MemoryServiceImpl {}
 
 #[tonic::async_trait]
-impl Bookstore for BookStoreImpl {
-    async fn get_book(
+impl MemoryService for MemoryServiceImpl {
+    async fn get_memory_metadata (
         &self,
-        request: Request<GetBookRequest>,
-    ) -> Result<Response<GetBookResponse>, Status> {
-        println!("Request from {:?}", request.remote_addr());
-
-        let response = GetBookResponse {
-            id: request.into_inner().id,
-            author: "Peter".to_owned(),
-            name: "Zero to One".to_owned(),
-            year: 2014,
+        _request: Request<()>,
+    ) -> Result<Response<MemoryMetadata>, Status> {
+        let metadata = MemoryMetadata {
+            primary: Some(memory::Memory {
+                total: 1024,
+                used: 512,
+                free: 512,
+            }),
+            swaps: None,
         };
-        Ok(Response::new(response))
+
+        Ok(Response::new(metadata))
     }
 }
 
@@ -113,18 +116,21 @@ async fn bandwidth_listener() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:50051".parse().unwrap();
-    let bookstore = BookStoreImpl::default();
-
+    let memory_service = MemoryServiceImpl::default();
+    let server = MemoryServiceServer::new(memory_service);
+    
+    /*  
     let reflection_service = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(bookstore::FILE_DESCRIPTOR_SET)
+        .register_encoded_file_descriptor_set(memory::FILE_DESCRIPTOR_SET)
         .build()
         .unwrap();
+    */
 
     println!("gRPC server listening on {}", addr);
 
     Server::builder()
-        .add_service(BookstoreServer::new(bookstore))
-        .add_service(reflection_service) // Add this
+        .add_service(server)
+        /*  .add_service(reflection_service) uncomment this if you want reflection */
         .serve(addr)
         .await?;
 

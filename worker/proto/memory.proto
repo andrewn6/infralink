@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package memory;
+
+message MemoryMetadata {
+  Memory primary = 1;
+  Memory swaps = 2;
+}
+
+message Memory {
+  uint64 total = 1;
+  uint64 used = 2;
+  uint64 free = 3;
+}
+
+service MemoryService {
+  rpc GetMemoryMetadata (google.protobuf.Empty) returns (MemoryMetadata);
+} 
