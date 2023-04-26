@@ -6,6 +6,7 @@ use std::time::Duration;
 use tokio::task;
 use tokio::time::sleep;
 
+#[derive(Default)]
 pub struct BandwidthMonitor {
 	sent_bytes: Arc<AtomicU64>,
 	average_outbound_bandwidth_per_second: Arc<AtomicU64>,
