@@ -1,3 +1,3 @@
 # Infralink
 
-Simple cloud agonistic container orchestration
+Simple cloud agonistic container orchestration.
