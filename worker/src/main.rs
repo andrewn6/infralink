@@ -1,3 +1,10 @@
+use std::collections::HashMap;
+use std::time::Duration;
+
+use podman_api::models::ContainerStats;
+use podman_api::opts::ContainerListOpts;
+use podman_api::{Podman};
+
 use tonic::{transport::Server, Request, Response, Status};
 // use tonic::{Request, Response, Status};
 
@@ -15,7 +22,6 @@ use tonic::{transport::Server, Request, Response, Status};
 // use proto_storage::StorageMetadata;
 
 // use std::sync::Arc;
-
 use hello_world::greeter_server::{Greeter, GreeterServer};
 use hello_world::{HelloReply, HelloRequest};
 
@@ -57,6 +63,9 @@ pub struct NetworkServiceImpl {}
 #[derive(Default)]
 pub struct MyGreeter {}
 
+#[derive(Default)]
+struct ContainerStatsImpl {}
+
 #[tonic::async_trait]
 impl Greeter for MyGreeter {
     async fn say_hello(
@@ -72,6 +81,33 @@ impl Greeter for MyGreeter {
     }
 }
 
+#[tonic::async_trait]
+trait GetStats {
+	async fn get_stats(&self, request: Request<()>) -> Result<Response<HashMap<String, String>>, Status> {
+		Ok(Response::new(HashMap::new()))
+	}
+}
+
+
+#[tonic::async_trait]
+impl GetStats for ContainerStats {
+    async fn get_stats(&self, request: Request<()>) -> Result<Response<HashMap<String, String>>, Status> {
+        let mut stats = HashMap::new();
+
+        let podman = Podman::new(None)?;
+        let containers = podman.containers().list(&podman_api::opts::ContainerListOpts::default()).await;
+        for container in containers {
+            let stats_result = podman.containers().stats(&container, Duration::from_secs(1)).await;
+            if let Ok(stats) = stats_result {
+                for (key, value) in stats.into_iter() {
+                    let value_str = value.unwrap_or_default().to_string();
+                    stats.insert(key, value_str);
+                }
+            }
+        }
+        Ok(Response::new(stats))
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
