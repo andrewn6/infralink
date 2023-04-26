@@ -1,19 +1,19 @@
 syntax = "proto3";
 
-import "google/protobuf/empty.proto";
-
 package compute;
 
+import "google/protobuf/empty.proto";
+
 message ComputeMetadata {
-    uint64 num_cores = 1;
-    repeated Cpu cpus = 2;
+  uint64 num_cores = 1;
+  repeated Cpu cpus = 2;
 }
 
 message Cpu {
-    uint64 frequency = 1;
-    float load = 2;
+  uint64 frequency = 1;
+  float load = 2;
 }
 
 service ComputeService {
-    rpc GetComputeMetadata (google.protobuf.Empty) returns (ComputeMetadata);
+  rpc GetComputeMetadata (google.protobuf.Empty) returns (ComputeMetadata);
 }
