@@ -94,7 +94,8 @@ impl GetStats for ContainerStats {
     async fn get_stats(&self, request: Request<()>) -> Result<Response<HashMap<String, String>>, Status> {
         let mut stats = HashMap::new();
 
-        let podman = Podman::new(None)?;
+
+        let podman = Podman::unix("unix:///var/run/podman/podman.sock");
         let containers = podman.containers().list(&podman_api::opts::ContainerListOpts::default()).await;
         for container in containers {
             let stats_result = podman.containers().stats(&container, Duration::from_secs(1)).await;
