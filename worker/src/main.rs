@@ -66,9 +66,6 @@ pub struct NetworkServiceImpl {}
 #[derive(Default)]
 pub struct MyGreeter {}
 
-#[derive(Default)]
-struct ContainerStatsImpl {}
-
 #[tonic::async_trait]
 impl Greeter for MyGreeter {
     async fn say_hello(
@@ -128,8 +125,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// let compute_server = ComputeServiceServer::new(compute_service);
 	// let network_server = NetworkServiceServer::new(network_service);
 	// let storage_server = StorageServiceServer::new(storage_service);
-
-	let stats_service = ContainerStatsImpl::default();
 
 	let reflection_service = tonic_reflection::server::Builder::configure()
 		.register_encoded_file_descriptor_set(proto_memory::FILE_DESCRIPTOR_SET)
