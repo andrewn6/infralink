@@ -4,8 +4,9 @@ use std::time::Duration;
 use podman_api::api::Container;
 use podman_api::models::ContainerStats;
 use podman_api::opts::ContainerStatsOpts;
-use podman_api::opts::{ContainerListOpts};
-use podman_api::{Podman};
+use podman_api::opts::ContainerListOpts;
+use podman_api::models::ContainerStats200Response;
+use podman_api::Podman;
 
 use tonic::{transport::Server, Request, Response, Status};
 // use tonic::{Request, Response, Status};
@@ -92,17 +93,18 @@ trait GetStats {
 impl GetStats for ContainerStats {
     async fn get_stats(&self, request: Request<()>) -> Result<Response<HashMap<String, String>>, Status> {
         let mut stats_result: HashMap<String, String> = HashMap::new();
-
+		
+		// Change this accordingle
         let podman = Podman::unix("unix:///var/run/podman/podman.sock");
         let container_stats_opts = podman_api::opts::ContainerStatsOpts::default();
 		let container_list_opts = podman_api::opts::ContainerListOpts::default();
         let containers = podman.containers().list(&container_list_opts).await;
 
         for container in containers {
-			let stats = podman.containers().stats(&container_stats_opts).await;
-			for (key, value) in stats.into_iter() {
-				let value_str = value.unwrap_or_default(stats).to_string();
-				stats_result.insert(key, value_str);
+			let stats: ContainerStats200Response = podman.containers().stats(&container_stats_opts).await.unwrap();
+			for (key, value) in stats.as_object().unwrap() {
+				let value_str = value.to_string();
+				stats_result.insert(key.to_string(), value_str);
 			}
 		}
 		Ok(Response::new(stats_result))
@@ -126,6 +128,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// let compute_server = ComputeServiceServer::new(compute_service);
 	// let network_server = NetworkServiceServer::new(network_service);
 	// let storage_server = StorageServiceServer::new(storage_service);
+
+	let stats_service = ContainerStatsImpl::default();
 
 	let reflection_service = tonic_reflection::server::Builder::configure()
 		.register_encoded_file_descriptor_set(proto_memory::FILE_DESCRIPTOR_SET)
