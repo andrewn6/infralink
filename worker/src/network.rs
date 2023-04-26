@@ -1,10 +1,14 @@
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NetworkMetadata {
-    #[prost(uint64, tag = "1")]
-    pub total_outbound: u64,
-    #[prost(uint64, tag = "2")]
-    pub average_outbound_bandwidth_per_second: u64,
+    #[prost(uint64, optional, tag = "1")]
+    pub total_outbound_bandwidth: ::core::option::Option<u64>,
+    #[prost(uint64, optional, tag = "2")]
+    pub total_inbound_bandwidth: ::core::option::Option<u64>,
+    #[prost(uint64, optional, tag = "3")]
+    pub average_outbound_bandwidth_per_second: ::core::option::Option<u64>,
+    #[prost(uint64, optional, tag = "4")]
+    pub average_inbound_bandwidth_per_second: ::core::option::Option<u64>,
 }
 /// Generated client implementations.
 pub mod network_service_client {
