@@ -1,32 +1,24 @@
-use tonic::{transport::Server, Request, Response, Status};
+pub mod data;
+pub mod models;
 
-use local_ip_address::local_ip;
-use pcap::Device;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::task;
-use tokio::time::sleep;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
 
-use memory::{
-    MemoryMetadata,
-    memory_service_server::{MemoryService, MemoryServiceServer},
-};
+use proto_memory::memory_service_server::{MemoryService, MemoryServiceServer};
+use proto_memory::MemoryMetadata;
 
-use compute::{
-    ComputeMetadata,
-    compute_service_server::{ComputeService, ComputeServiceServer},
-};
+use proto_compute::compute_service_server::{ComputeService, ComputeServiceServer};
+use proto_compute::ComputeMetadata;
 
-mod compute {
-    include!("compute.rs");
+mod proto_compute {
+	include!("compute.rs");
 }
 
-mod memory {
-    include!("memory.rs");
+mod proto_memory {
+	include!("memory.rs");
 
-    pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
-        tonic::include_file_descriptor_set!("greeter_descriptor");
+	pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
+		tonic::include_file_descriptor_set!("greeter_descriptor");
 }
 
 #[derive(Default)]
@@ -35,130 +27,177 @@ pub struct ComputeServiceImpl {}
 #[derive(Default)]
 pub struct MemoryServiceImpl {}
 
-#[tonic::async_trait]
-impl MemoryService for MemoryServiceImpl {
-    async fn get_memory_metadata (
-        &self,
-        _request: Request<()>,
-    ) -> Result<Response<MemoryMetadata>, Status> {
-        let metadata = MemoryMetadata {
-            primary: Some(memory::Memory {
-                total: 1024,
-                used: 512,
-                free: 512,
-            }),
-            swaps: None,
-        };
+#[derive(Default)]
+pub struct StorageServiceImpl {}
 
-        Ok(Response::new(metadata))
-    }
-}
+#[derive(Default)]
+pub struct NetworkServiceImpl {}
+
+// impl NetworkServiceServer {
+// pub fn start() {}
+// }
 
 #[tonic::async_trait]
 impl ComputeService for ComputeServiceImpl {
-    async fn get_compute_metadata (
-        &self,
-        _request: Request<()>,
-    ) -> Result<Response<ComputeMetadata>, Status> {
-        //let metadata = ComputeMetadata {
-            // add metadata stuff later
-        //};
+	async fn get_compute_metadata(
+		&self,
+		_request: Request<()>,
+	) -> Result<Response<ComputeMetadata>, Status> {
+		// Fetch compute metadata
+		let metadata = data::compute::compute_usage();
 
-        Ok(Response::new(metadata))
-    }
+		// Convert the compute metadata into the protobuf struct
+
+		let cpus = metadata
+			.cpus
+			.unwrap()
+			.iter()
+			.map(|cpu| {
+				proto_compute::Cpu {
+					frequency: cpu.frequency.unwrap(),
+					load: cpu.load.unwrap(),
+				}
+			})
+			.collect();
+
+		Ok(Response::new(proto_compute::ComputeMetadata {
+			num_cores: metadata.num_cores.unwrap(),
+			cpus: cpus,
+		}))
+	}
 }
 
-async fn capture_outbound_packets(
-    local_ip_address: String,
-    sent_bytes: Arc<AtomicU64>,
-) -> Result<(), pcap::Error> {
-    let device = Device::lookup()?;
-    let mut capture = device.unwrap().open()?;
+#[tonic::async_trait]
+impl MemoryService for MemoryServiceImpl {
+	async fn get_memory_metadata(
+		&self,
+		_request: Request<()>,
+	) -> Result<Response<MemoryMetadata>, Status> {
+		// Fetch memory metadata
+		let metadata = data::mem::memory();
 
-    capture.filter(&format!("src host {local_ip_address}"), true)?; // Capture only outbound packets
+		// Convert the memory metadata into the protobuf struct
+		let primary = metadata.clone().primary.unwrap();
+		let swap = metadata.clone().swap.unwrap();
 
-    loop {
-        let packet = capture.next_packet()?;
-        sent_bytes.fetch_add(packet.header.len as u64, Ordering::SeqCst);
-    }
+		Ok(Response::new(proto_memory::MemoryMetadata {
+			primary: Some(proto_memory::Memory {
+				total: primary.total.unwrap(),
+				used: primary.used.unwrap(),
+				free: primary.free.unwrap(),
+			}),
+			swap: Some(proto_memory::Memory {
+				total: swap.total.unwrap(),
+				used: swap.used.unwrap(),
+				free: swap.free.unwrap(),
+			}),
+		}))
+	}
 }
 
-// Calculates the average outbound bandwidth rate in bytes per second and returns it
-async fn calculate_average_outbound_bandwidth(
-    average_outbound_bandwidth_per_second: Arc<AtomicU64>,
-    sent_bytes: Arc<AtomicU64>,
-) {
-    // The index is used to calculate the average bandwidth rate (how many times the loop has run)
-    let mut index = 0;
+// #[tonic::async_trait]
+// impl StorageService for StorageServiceImpl {
+// 	async fn get_storage_metadata(
+// 		&self,
+// 		_request: Request<()>,
+// 	) -> Result<Response<StorageMetadata>, Status> {
+// 		// Fetch storage metadata
+// 		let metadata = data::storage::storage();
 
-    loop {
-        // Sent bandwidth before the sleep
-        let initial_sent_bytes = sent_bytes.load(Ordering::SeqCst);
+// 		// Convert the storage metadata into the protobuf struct
+// 		let primary = metadata.clone().primary.unwrap();
+// 		let volumes = metadata
+// 			.clone()
+// 			.volumes
+// 			.unwrap()
+// 			.iter()
+// 			.map(|volume| {
+// 				proto_storage::Volume {
+// 					total: volume.total.unwrap(),
+// 					used: volume.used.unwrap(),
+// 					free: volume.free.unwrap(),
+// 				}
+// 			})
+// 			.collect();
 
-        // Sleep for 30 seconds
-        sleep(Duration::from_secs(2)).await;
+// 		Ok(Response::new(proto_memory::MemoryMetadata {
+// 			primary: Some(proto_memory::Memory {
+// 				total: primary.total.unwrap(),
+// 				used: primary.used.unwrap(),
+// 				free: primary.free.unwrap(),
+// 			}),
+// 			volumes,
+// 		}))
+// 	}
+// }
 
-        // Sent bandwidth after the sleep
-        let current_sent_bytes = sent_bytes.load(Ordering::SeqCst);
+// #[tonic::async_trait]
+// impl NetworkService for NetworkServiceImpl {
+// 	async fn get_network_metadata(
+// 		&self,
+// 		_request: Request<()>,
+// 	) -> Result<Response<MemoryMetadata>, Status> {
+// 		// Fetch storage metadata
+// 		let metadata = data::network::network();
 
-        index += 1;
+// 		// Convert the storage metadata into the protobuf struct
+// 		let primary = metadata.clone().primary.unwrap();
+// 		let volumes = metadata
+// 			.clone()
+// 			.volumes
+// 			.unwrap()
+// 			.iter()
+// 			.map(|volume| {
+// 				proto_storage::Volume {
+// 					total: volume.total.unwrap(),
+// 					used: volume.used.unwrap(),
+// 					free: volume.free.unwrap(),
+// 				}
+// 			})
+// 			.collect();
 
-        let outbound_transferred_during_sleep_per_sec =
-            (current_sent_bytes - initial_sent_bytes) / 2;
-
-        average_outbound_bandwidth_per_second.store(
-            (average_outbound_bandwidth_per_second.load(Ordering::SeqCst)
-                + outbound_transferred_during_sleep_per_sec)
-                / index,
-            Ordering::SeqCst,
-        );
-
-        println!(
-            "Average outbound bandwidth rate: {} bytes/s",
-            average_outbound_bandwidth_per_second.load(Ordering::SeqCst)
-        );
-    }
-}
-
-async fn bandwidth_listener() -> Result<(), Box<dyn std::error::Error>> {
-    let sent_bytes = Arc::new(AtomicU64::new(0));
-    let average_outbound_bandwidth_per_second = Arc::new(AtomicU64::new(0));
-
-    let capture_task = task::spawn(capture_outbound_packets(
-        local_ip().unwrap().to_string(),
-        sent_bytes.clone(),
-    ));
-
-    let poll_task = task::spawn(calculate_average_outbound_bandwidth(
-        average_outbound_bandwidth_per_second,
-        sent_bytes,
-    ));
-
-    let _ = tokio::try_join!(capture_task, poll_task)?;
-
-    Ok(())
-}
+// 		Ok(Response::new(proto_memory::MemoryMetadata {
+// 			primary: Some(proto_memory::Memory {
+// 				total: primary.total.unwrap(),
+// 				used: primary.used.unwrap(),
+// 				free: primary.free.unwrap(),
+// 			}),
+// 			volumes,
+// 		}))
+// 	}
+// }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse().unwrap();
-    let memory_service = MemoryServiceImpl::default();
-    let server = MemoryServiceServer::new(memory_service);
-    
-    
-    let reflection_service = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(memory::FILE_DESCRIPTOR_SET)
-        .build()
-        .unwrap();
-    
+	let addr = "[::1]:50051".parse().unwrap();
 
-    println!("gRPC server listening on {}", addr);
+	// Initialize the memory, compute, storage, and network measurement services
+	let memory_service = MemoryServiceImpl::default();
+	let compute_service = ComputeServiceImpl::default();
+	// let storage_service = StorageServiceImpl::default();
+	// let network_service = NetworkServiceImpl::default();
 
-    Server::builder()
-        .add_service(server)
-        .add_service(reflection_service)
-        .serve(addr)
-        .await?;
+	// Create the gRPC servers for each service
+	let memory_server = MemoryServiceServer::new(memory_service);
+	let compute_server = ComputeServiceServer::new(compute_service);
+	// let network_service = NetworkServiceServer::new(network_service);
+	// let storage_server = StorageServiceServer::new(storage_service);
 
-    Ok(())
+	let reflection_service = tonic_reflection::server::Builder::configure()
+		.register_encoded_file_descriptor_set(proto_memory::FILE_DESCRIPTOR_SET)
+		.build()
+		.unwrap();
+
+	println!("gRPC server listening on {}", addr);
+
+	Server::builder()
+		.add_service(memory_server)
+		.add_service(compute_server)
+		// .add_service(storage_server)
+		// .add_service(network_service)
+		.add_service(reflection_service)
+		.serve(addr)
+		.await?;
+
+	Ok(())
 }

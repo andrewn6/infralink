@@ -4,7 +4,7 @@ pub struct MemoryMetadata {
     #[prost(message, optional, tag = "1")]
     pub primary: ::core::option::Option<Memory>,
     #[prost(message, optional, tag = "2")]
-    pub swaps: ::core::option::Option<Memory>,
+    pub swap: ::core::option::Option<Memory>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package network;
+
+import "google/protobuf/empty.proto";
+
+message NetworkMetadata {
+  uint64 total_outbound = 1;
+  uint64 average_outbound_bandwidth_per_second = 2;
+}
+
+service NetworkService {
+  rpc GetNetworkMetadata (google.protobuf.Empty) returns (NetworkMetadata);
+}

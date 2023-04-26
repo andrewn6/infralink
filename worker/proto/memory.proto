@@ -6,7 +6,7 @@ import "google/protobuf/empty.proto";
 
 message MemoryMetadata {
   Memory primary = 1;
-  Memory swaps = 2;
+  Memory swap = 2;
 }
 
 message Memory {
