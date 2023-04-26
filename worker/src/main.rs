@@ -1,4 +1,4 @@
-use tonic::transport::Server;
+use tonic::{transport::Server, Request, Response, Status};
 // use tonic::{Request, Response, Status};
 
 // Load in gRPC service definitions
@@ -15,6 +15,13 @@ use tonic::transport::Server;
 // use proto_storage::StorageMetadata;
 
 // use std::sync::Arc;
+
+use hello_world::greeter_server::{Greeter, GreeterServer};
+use hello_world::{HelloReply, HelloRequest};
+
+mod hello_world {
+    include!("helloworld.rs");
+}
 
 mod proto_compute {
 	include!("compute.rs");
@@ -47,9 +54,29 @@ pub struct StorageServiceImpl {}
 #[derive(Default)]
 pub struct NetworkServiceImpl {}
 
+#[derive(Default)]
+pub struct MyGreeter {}
+
+#[tonic::async_trait]
+impl Greeter for MyGreeter {
+    async fn say_hello(
+        &self,
+        request: Request<HelloRequest>,
+    ) -> Result<Response<HelloReply>, Status> {
+        println!("Got a request from {:?}", request.remote_addr());
+
+        let reply = hello_world::HelloReply {
+            message: format!("Hello {}!", request.into_inner().name),
+        };
+        Ok(Response::new(reply))
+    }
+}
+
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let addr = "[::1]:50051".parse().unwrap();
+    let addr = "[::1]:50051".parse().unwrap();
+    let greeter = MyGreeter::default();
 
 	// Initialize the memory, compute, storage, and network measurement services
 	// let memory_service = MemoryServiceImpl::default();
@@ -69,16 +96,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.build()
 		.unwrap();
 
-	println!("gRPC server listening on {}", addr);
+    println!("GreeterServer listening on {}", addr);
 
-	Server::builder()
-		// .add_service(memory_server)
-		// .add_service(compute_server)
-		// .add_service(storage_server)
-		// .add_service(network_server)
+    Server::builder()
+        .add_service(GreeterServer::new(greeter))
 		.add_service(reflection_service)
-		.serve(addr)
-		.await?;
+        .serve(addr)
+        .await?;
 
-	Ok(())
+    Ok(())
 }
