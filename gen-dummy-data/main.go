@@ -29,10 +29,10 @@ func main() {
 	writer := bufio.NewWriter(file)
 
 	for {
-		cpu := rand.NormFloat64()*10 + 70
-		memory := rand.Float64()*10 + 70
-		disk := rand.Float64()*10 + 50
-		network := rand.NormFloat64()*10 + 1000
+		cpu := rand.NormFloat64()*20 + 70
+		memory := rand.Float64()*20 + 70
+		disk := rand.Float64()*20 + 50
+		network := rand.NormFloat64()*50 + 1000
 
 		data := Data{
 			CPU:     cpu,
