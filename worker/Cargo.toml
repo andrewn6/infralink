@@ -10,11 +10,9 @@ tonic = "0.8.3"
 prost = "0.11.8"
 tokio = { version = "1.18", features = ["macros", "rt-multi-thread"] }
 tonic-reflection = "0.6.0"
-sysinfo = "0.28.4"
-pcap = "1.0.0"
-local-ip-address = "0.5.1"
 tonic-build = "0.8.4"
-etherparse = "0.13.0"
+podman-api = "0.10.0"
+reqwest = "0.11.16"
 
 [build-dependencies]
 tonic-build = "0.8.4"

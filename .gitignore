@@ -1,1 +1,3 @@
 /target
+# Ignore all .env files
+**/.env

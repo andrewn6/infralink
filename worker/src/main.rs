@@ -15,10 +15,7 @@ use tonic::transport::Server;
 // use proto_storage::StorageMetadata;
 
 // use std::sync::Arc;
-
-mod proto_compute {
-	include!("compute.rs");
-}
+pub mod resource;
 
 mod proto_memory {
 	include!("memory.rs");
@@ -27,42 +24,9 @@ mod proto_memory {
 		tonic::include_file_descriptor_set!("greeter_descriptor");
 }
 
-mod proto_storage {
-	include!("storage.rs");
-}
-
-mod proto_network {
-	include!("network.rs");
-}
-
-#[derive(Default)]
-pub struct ComputeServiceImpl {}
-
-#[derive(Default)]
-pub struct MemoryServiceImpl {}
-
-#[derive(Default)]
-pub struct StorageServiceImpl {}
-
-#[derive(Default)]
-pub struct NetworkServiceImpl {}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let addr = "[::1]:50051".parse().unwrap();
-
-	// Initialize the memory, compute, storage, and network measurement services
-	// let memory_service = MemoryServiceImpl::default();
-	// let compute_service = ComputeServiceImpl::default();
-	// let storage_service = StorageServiceImpl::default();
-	// Change the param to true if we want to meter incoming bandwidth
-	// let network_service = NetworkServiceImpl::default();
-
-	// Create the gRPC servers for each service
-	// let memory_server = MemoryServiceServer::new(memory_service);
-	// let compute_server = ComputeServiceServer::new(compute_service);
-	// let network_server = NetworkServiceServer::new(network_service);
-	// let storage_server = StorageServiceServer::new(storage_service);
 
 	let reflection_service = tonic_reflection::server::Builder::configure()
 		.register_encoded_file_descriptor_set(proto_memory::FILE_DESCRIPTOR_SET)
@@ -72,10 +36,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	println!("gRPC server listening on {}", addr);
 
 	Server::builder()
-		// .add_service(memory_server)
-		// .add_service(compute_server)
-		// .add_service(storage_server)
-		// .add_service(network_server)
 		.add_service(reflection_service)
 		.serve(addr)
 		.await?;
