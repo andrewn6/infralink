@@ -2,6 +2,7 @@
 name = "worker"
 version = "0.1.0"
 edition = "2021"
+workspace = ".."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -14,6 +15,8 @@ sysinfo = "0.28.4"
 pcap = "1.0.0"
 local-ip-address = "0.5.1"
 tonic-build = "0.8.4"
+etherparse = "0.13.0"
+podman-api = "0.10.0"
 
 [build-dependencies]
 tonic-build = "0.8.4"

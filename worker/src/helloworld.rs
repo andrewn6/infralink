@@ -1,25 +1,28 @@
+/// The request message containing the user's name.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct NetworkMetadata {
-    #[prost(uint64, optional, tag = "1")]
-    pub total_outbound_bandwidth: ::core::option::Option<u64>,
-    #[prost(uint64, optional, tag = "2")]
-    pub total_inbound_bandwidth: ::core::option::Option<u64>,
-    #[prost(uint64, optional, tag = "3")]
-    pub average_outbound_bandwidth_per_second: ::core::option::Option<u64>,
-    #[prost(uint64, optional, tag = "4")]
-    pub average_inbound_bandwidth_per_second: ::core::option::Option<u64>,
+pub struct HelloRequest {
+    #[prost(string, tag = "1")]
+    pub name: ::prost::alloc::string::String,
+}
+/// The response message containing the greetings
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct HelloReply {
+    #[prost(string, tag = "1")]
+    pub message: ::prost::alloc::string::String,
 }
 /// Generated client implementations.
-pub mod network_service_client {
+pub mod greeter_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
+    /// The greeting service definition.
     #[derive(Debug, Clone)]
-    pub struct NetworkServiceClient<T> {
+    pub struct GreeterClient<T> {
         inner: tonic::client::Grpc<T>,
     }
-    impl NetworkServiceClient<tonic::transport::Channel> {
+    impl GreeterClient<tonic::transport::Channel> {
         /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
@@ -30,7 +33,7 @@ pub mod network_service_client {
             Ok(Self::new(conn))
         }
     }
-    impl<T> NetworkServiceClient<T>
+    impl<T> GreeterClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
@@ -48,7 +51,7 @@ pub mod network_service_client {
         pub fn with_interceptor<F>(
             inner: T,
             interceptor: F,
-        ) -> NetworkServiceClient<InterceptedService<T, F>>
+        ) -> GreeterClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
@@ -62,7 +65,7 @@ pub mod network_service_client {
                 http::Request<tonic::body::BoxBody>,
             >>::Error: Into<StdError> + Send + Sync,
         {
-            NetworkServiceClient::new(InterceptedService::new(inner, interceptor))
+            GreeterClient::new(InterceptedService::new(inner, interceptor))
         }
         /// Compress requests with the given encoding.
         ///
@@ -79,10 +82,11 @@ pub mod network_service_client {
             self.inner = self.inner.accept_compressed(encoding);
             self
         }
-        pub async fn get_network_metadata(
+        /// Sends a greeting
+        pub async fn say_hello(
             &mut self,
-            request: impl tonic::IntoRequest<()>,
-        ) -> Result<tonic::Response<super::NetworkMetadata>, tonic::Status> {
+            request: impl tonic::IntoRequest<super::HelloRequest>,
+        ) -> Result<tonic::Response<super::HelloReply>, tonic::Status> {
             self.inner
                 .ready()
                 .await
@@ -94,32 +98,34 @@ pub mod network_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/network.NetworkService/GetNetworkMetadata",
+                "/helloworld.Greeter/SayHello",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }
 /// Generated server implementations.
-pub mod network_service_server {
+pub mod greeter_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with NetworkServiceServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with GreeterServer.
     #[async_trait]
-    pub trait NetworkService: Send + Sync + 'static {
-        async fn get_network_metadata(
+    pub trait Greeter: Send + Sync + 'static {
+        /// Sends a greeting
+        async fn say_hello(
             &self,
-            request: tonic::Request<()>,
-        ) -> Result<tonic::Response<super::NetworkMetadata>, tonic::Status>;
+            request: tonic::Request<super::HelloRequest>,
+        ) -> Result<tonic::Response<super::HelloReply>, tonic::Status>;
     }
+    /// The greeting service definition.
     #[derive(Debug)]
-    pub struct NetworkServiceServer<T: NetworkService> {
+    pub struct GreeterServer<T: Greeter> {
         inner: _Inner<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
     }
     struct _Inner<T>(Arc<T>);
-    impl<T: NetworkService> NetworkServiceServer<T> {
+    impl<T: Greeter> GreeterServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -153,9 +159,9 @@ pub mod network_service_server {
             self
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for NetworkServiceServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for GreeterServer<T>
     where
-        T: NetworkService,
+        T: Greeter,
         B: Body + Send + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
@@ -171,21 +177,22 @@ pub mod network_service_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/network.NetworkService/GetNetworkMetadata" => {
+                "/helloworld.Greeter/SayHello" => {
                     #[allow(non_camel_case_types)]
-                    struct GetNetworkMetadataSvc<T: NetworkService>(pub Arc<T>);
-                    impl<T: NetworkService> tonic::server::UnaryService<()>
-                    for GetNetworkMetadataSvc<T> {
-                        type Response = super::NetworkMetadata;
+                    struct SayHelloSvc<T: Greeter>(pub Arc<T>);
+                    impl<T: Greeter> tonic::server::UnaryService<super::HelloRequest>
+                    for SayHelloSvc<T> {
+                        type Response = super::HelloReply;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
-                        fn call(&mut self, request: tonic::Request<()>) -> Self::Future {
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::HelloRequest>,
+                        ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move {
-                                (*inner).get_network_metadata(request).await
-                            };
+                            let fut = async move { (*inner).say_hello(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -194,7 +201,7 @@ pub mod network_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = GetNetworkMetadataSvc(inner);
+                        let method = SayHelloSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -221,7 +228,7 @@ pub mod network_service_server {
             }
         }
     }
-    impl<T: NetworkService> Clone for NetworkServiceServer<T> {
+    impl<T: Greeter> Clone for GreeterServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -231,7 +238,7 @@ pub mod network_service_server {
             }
         }
     }
-    impl<T: NetworkService> Clone for _Inner<T> {
+    impl<T: Greeter> Clone for _Inner<T> {
         fn clone(&self) -> Self {
             Self(self.0.clone())
         }
@@ -241,7 +248,7 @@ pub mod network_service_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: NetworkService> tonic::server::NamedService for NetworkServiceServer<T> {
-        const NAME: &'static str = "network.NetworkService";
+    impl<T: Greeter> tonic::server::NamedService for GreeterServer<T> {
+        const NAME: &'static str = "helloworld.Greeter";
     }
 }
