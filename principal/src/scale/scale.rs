@@ -4,6 +4,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+/* Holds metric data  */
 #[derive(Debug)]
 pub struct Metrics {
     cpu: f64,
@@ -13,12 +14,15 @@ pub struct Metrics {
     time: SystemTime,
 }
 
-fn main()  {
+fn main() {
+    /* Creates a channel to communciate between threads */
     let (tx, rs) = mpsc::channel();
 
+    /*  Set thresholds for latency and request rates */
     let request_rate_threshold = 10.0;
     let latency_threshold = 100.0;
 
+    /* Spawn a thread to read data from a file and send it over the channel (this will be replaced with a Podman container in the future) */
     thread::spawn(move || {
       let file = File::open("../data/dummy_data.json").unwrap();
       let reader = BufReader::new(file);
