@@ -37,16 +37,17 @@ fn main() {
     let connection = Connection::open(&OpenConnectionArguments::new(
             "localhost",
             5672,
-            "user",
-            "bitnami",
+            "guest",
+            "guest",
     ))  
     .await
     .unwrap();
     connection
-        .register_callback(DefaultChannelCallback::new())
+        .register_callback(DefaultConnectionCallback::new())
         .await()
         .unwrap();
 
+    let (tx, rs) = mpsc::channel::<Metrics>();
     let channel = connection.open_channel(None).await.unwrap();
     channel
         .register_callback(DefaultChannelCallback::new())
@@ -60,8 +61,47 @@ fn main() {
     let memory_threshold = 80.0;
     
     let queue_name = "metrics_queue";
-    let queue_declare_arguments = QueueDeclareArguments::default();
-    channel.queue_declare(queue_name, queue_declare_arguments).await.unwrap();
+    let consume_callback = move |delivery: amqprs::message::DeliveryResult| {
+        match delivery {
+            Ok(delivery) => {
+                let message = String::from_utf8(delivery.body).unwrap();
+                if let Ok(metrics) = serde_json::from_str::<Metrics>(&message) {
+                    tx.send(metrics).unwrap();
+                }
+            }
+            Err(e) => {
+                println!("Error: {:?}", e);
+            }
+        }
+    };
+    let queue_declare_args = QueueDeclareArguments::default();
+    let queue_consume_args = BasicConsumeArguments::default();
+    let queue_bind_args = QueueBindArguments::default();
+    
+    channel 
+        .queue_bind(
+            queue_name,
+            "",
+            queue_bind_args,
+            None,
+        )
+        .await
+        .unwrap();
+    
+    let consumer = DefaultConsumer::new(
+        consume_callback,
+        None
+    );
+
+    let _consumer_tag = channel
+        .basic_consume(
+            queue_name,
+            consumer,
+            queue_consume_args,
+            queue_declare_args,
+        )
+        .await
+        .unwrap();
 
     /* Spawn a thread to read data from a file and send it over the channel (this will be replaced with a Podman container in the future) */
     thread::spawn(move || {
@@ -72,72 +112,83 @@ fn main() {
         if let Ok(json_str) = line {
           if let Ok(metrics) = serde_json::from_str::<Metrics>(&json_str) {
             let message = amqprs::message::BasicPublishMessage::default()
-                .with_body(json_str.as_bytes().to_vec());
-            let queue_binds_args = QueueBindArguments::default();
-            channel 
-                .basic_publish(
-                    "",
-                    queue_name,
-                    message,
-                    queue_binds_args,
-                    None,
-                )
-                .unwrap();
+                .with_body(json_str.as_bytes().to_vec())
+                .with_properties(
+                    amqprs::message::BasicPublishProperties::default()
+                        .with_content_type("application/json".to_string())
+                        .with_delivery_mode(amqprs::message::DeliveryMode::Persistent),
+                );
+            channel.basic_publish(message, "", queue_name).await.unwrap();
+                
           }
         }
       }  
     });
 
-    let mut replica_count = 1;
+    thread::spawn(move || {
+        let mut metrics = Vec::<Metrics>::new();
+        let mut last_notification = SystemTime::now();
+        let notify = Notify::new();
 
-    loop {
-        let mut request_count = 0;
-        let mut latency_sum = 0.0;
-        let mut metrics_count = 0;
-        let mut cpu_sum = 0.0;
-        let mut memory_sum = 0.0;
+        loop {
+            match rx.try_recv() { 
+                Ok(metric) => {
+                    metrics.push(metric);
+                }
+                Err(mpsc::TryRecvError::Empty) => {
+                    let mut cpu_total = 0.0;
+                    let mut memory_total = 0.0;
+                    let mut disk_total = 0.0;
+                    let mut network_total = 0.0;
 
-        for metrics in rx.try_iter() {
-            if SystemTime::now().duration_since(metrics.time).unwrap().as_secs() > 60 {
-                break;
+                    let mut nim_metrics = metrics.len() as f64;
+
+                    for metric in metrics.iter() {
+                        cpu_total += metric.cpu;
+                        memory_total += metric.memory;
+                        disk_total += metric.disk;
+                        network_total += metric.network;
+                    }
+
+                    if num_metrics > 0.0 {
+                        let cpu_avg = cpu_total / num_metrics;
+                        let memory_avg = memory_total / num_metrics;
+                        let disk_avg = disk_total / num_metrics;
+                        let network_avg = network_total / num_metrics;
+
+                        println!("CPU: {} Memory: {} Disk: {} Network: {}", cpu_avg, memory_avg, disk_avg, network_avg);
+                    }
+
+                    if cpu_avg > cpu_threshold {
+                        println!("CPU usage is above threshold of {}$", cpu_threshold);
+                    }
+
+                    if memory_avg > memory_threshold {
+                        println!("Memory usage is above threshold of {}$", memory_threshold);
+                    }
+
+                    if network_avg > network_threshold {
+                        println!("Network usage is above threshold of {}$", network_threshold);
+                    }
+
+                    let elapsed_time = last_notification.elapsed().unwrap().as_millis() as f64;
+                    if elapsed_time > latency_threshold {
+                        println!("Latency is above threshold of {}ms", latency_threshold);
+                    }
+
+                    metrics.clear();
+                    /* Clear metrics after */
+                    num_metrics = 0.0;
+
+                    last_notification = SystemTime::now();
+
+                    notify.notify_one();
+                }
             }
-            request_count += 1;
-            latency_sum += metrics.network;
-            metrics_count += 1;
-            cpu_sum += metrics.cpu;
-            memory_sum += metrics.memory;
+           
         }
 
-        if request_count > 0 {
-            let request_rate = request_count as f64 / 60.0;
-            let latency = latency_sum / metrics_count as f64;
-            let cpu = cpu_sum / metrics_count as f64;
-            let memory = memory_sum / metrics_count as f64;
-
-            println!("request_rate: {}", request_rate);
-            println!("latency: {}", latency);
-            println!("cpu usage: {}", latency);
-            println!("memory usage: {}", latency);
-            
-            /* Scale up if request wate/latency exceeds the thresholds */
-            if request_rate >  request_rate_threshold 
-
-                && latency < latency_threshold
-                && cpu_usage > cpu_threshold
-                && memory_usage > memory_threshold
-                
-            {
-                replica_count += 1;
-            } else if replica_count > 1
-                && (request_count < request_rate_threshold
-                    || latency > latency_threshold
-                    || cpu_usage < cpu_threshold
-                    || memory_usage < memory_threshold)
-            
-            {
-                replica_count -= 1;
-            }
-        }
-        thread::sleep(Duration::from_millis(1000));
-    }
+        std::thread::sleep(Duration::from_millis(1000));
+        
+    });
 }
