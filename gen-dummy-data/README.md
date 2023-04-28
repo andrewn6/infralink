@@ -1,0 +1,1 @@
+This folder has a script that generates random numbers to simulate CPU usage, memory & bandwidth, after it is stored in a `data.json` file. It is  only used for testing purposes (:
