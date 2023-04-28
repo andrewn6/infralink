@@ -25,6 +25,7 @@ use tonic::{transport::Server, Request, Response, Status};
 // use proto_storage::StorageMetadata;
 
 // use std::sync::Arc;
+pub mod resource;
 use hello_world::greeter_server::{Greeter, GreeterServer};
 use hello_world::{HelloReply, HelloRequest};
 
@@ -112,19 +113,6 @@ impl GetStats for ContainerStats {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:50051".parse().unwrap();
     let greeter = MyGreeter::default();
-
-	// Initialize the memory, compute, storage, and network measurement services
-	// let memory_service = MemoryServiceImpl::default();
-	// let compute_service = ComputeServiceImpl::default();
-	// let storage_service = StorageServiceImpl::default();
-	// Change the param to true if we want to meter incoming bandwidth
-	// let network_service = NetworkServiceImpl::default();
-
-	// Create the gRPC servers for each service
-	// let memory_server = MemoryServiceServer::new(memory_service);
-	// let compute_server = ComputeServiceServer::new(compute_service);
-	// let network_server = NetworkServiceServer::new(network_service);
-	// let storage_server = StorageServiceServer::new(storage_service);
 
 	let reflection_service = tonic_reflection::server::Builder::configure()
 		.register_encoded_file_descriptor_set(proto_memory::FILE_DESCRIPTOR_SET)
