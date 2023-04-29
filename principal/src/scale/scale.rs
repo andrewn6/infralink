@@ -12,15 +12,13 @@ use tracing::{info, error};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::fmt;
 
-use lapin::options::BasicPublishOptions;
 use lapin::{
     options::{BasicConsumeOptions, QueueBindOptions, QueueDeclareOptions},
-    BasicProperties, Channel, Connection, ConnectionProperties, Consumer,
-    message::DeliveryResult,
+    Connection, ConnectionProperties, 
 };
 
 
-/* Holds metric data  */
+/* Holds metric data */
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Metrics {
     cpu: f64,
@@ -92,69 +90,61 @@ async fn main() {
         let mut metrics = Vec::<Metrics>::new();
         let mut last_notification = SystemTime::now();
         let notify = Notify::new();
-
+    
         loop {
-            match rs.try_recv() { 
-
+            match rs.try_recv() {
                 Ok(metric) => {
                     metrics.push(metric);
                 }
-
                 Err(mpsc::TryRecvError::Empty) => {
                     let mut cpu_total = 0.0;
                     let mut memory_total = 0.0;
                     let mut disk_total = 0.0;
                     let mut network_total = 0.0;
-
-                    let mut num_metrics = metrics.len() as f64;
-
+    
+                    let num_metrics = metrics.len() as f64;
+    
                     for metric in metrics.iter() {
                         cpu_total += metric.cpu;
                         memory_total += metric.memory;
                         disk_total += metric.disk;
                         network_total += metric.network;
                     }
-
+    
                     let cpu_avg = cpu_total / num_metrics;
                     let memory_avg = memory_total / num_metrics;
                     let disk_avg = disk_total / num_metrics;
                     let network_avg = network_total / num_metrics;
                     let network_threshold = 50.0;
-
+    
                     if cpu_avg > cpu_threshold {
                         println!("CPU usage is above threshold of {}$", cpu_threshold);
                     }
-
+    
                     if memory_avg > memory_threshold {
                         println!("Memory usage is above threshold of {}$", memory_threshold);
                     }
-
+    
                     if network_avg > network_threshold {
                         println!("Network usage is above threshold of {}$", network_threshold);
                     }
-
+    
                     let elapsed_time = last_notification.elapsed().unwrap().as_millis() as f64;
                     if elapsed_time > latency_threshold {
                         println!("Latency is above threshold of {}ms", latency_threshold);
                     }
-                    
+    
                     metrics.clear();
-                    // used for debugging: num_metrics = 0.0
                     last_notification = SystemTime::now();
-
+    
                     notify.notify_one();
                 }
-
-                Err(TryRecvError::Disconnected) => {
-                    println!("The channel is disconnected, stopping metrics collection");
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    error!("The channel is disconnected, stopping metrics collection");
                     break;
                 }
-                
             }
-           
+            std::thread::sleep(Duration::from_millis(1000));
         }
-
-        std::thread::sleep(Duration::from_millis(1000));
-        
     });
 }
