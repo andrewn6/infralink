@@ -1,19 +1,24 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use std::sync::mpsc;
+use std::sync::mpsc::{self, TryRecvError};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
 use tokio::sync::Notify;
 use serde::{Deserialize, Serialize};
 
-use amqprs::{
-    callbacks::{DefaultChannelCallback, DefaultConnectionCallback},
-    channel::{BasicConsumeArguments, QueueBindArguments, QueueDeclareArguments},
-    connection::{Connection, OpenConnectionArguments},
-    consumer::DefaultConsumer,
+use tracing::{info, error};
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::fmt;
+
+use lapin::options::BasicPublishOptions;
+use lapin::{
+    options::{BasicConsumeOptions, QueueBindOptions, QueueDeclareOptions},
+    BasicProperties, Channel, Connection, ConnectionProperties, Consumer,
+    message::DeliveryResult,
 };
+
 
 /* Holds metric data  */
 #[derive(Debug, Deserialize, Serialize)]
@@ -25,34 +30,22 @@ pub struct Metrics {
     time: SystemTime,
 }
 
-#[tokio::main(flavor = "current_thread", workers=2)]
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
     /* Creates a channel to communciate between threads */
     tracing_subscriber::registry()  
         .with(fmt::layer())
-        .with(tracing_subscriber::EnvFilter::from_default_env())
         .try_init()
         .ok();
 
-    let connection = Connection::open(&OpenConnectionArguments::new(
-            "localhost",
-            5672,
-            "guest",
-            "guest",
-    ))  
-    .await
-    .unwrap();
-    connection
-        .register_callback(DefaultConnectionCallback::new())
-        .await()
-        .unwrap();
-
-    let (tx, rs) = mpsc::channel::<Metrics>();
-    let channel = connection.open_channel(None).await.unwrap();
-    channel
-        .register_callback(DefaultChannelCallback::new())
+    let addr = "amqp://guest:guest@localhost:5672/%2F";
+    let conn = Connection::connect(&addr, ConnectionProperties::default())
         .await
         .unwrap();
+    info!("Connected to RabbitMQ");
+
+    let (tx, rs) = mpsc::channel::<Metrics>();
+    let channel = conn.create_channel().await.unwrap();
 
     /*  Set thresholds for latency and request rates */
     let request_rate_threshold = 10.0;
@@ -61,46 +54,23 @@ fn main() {
     let memory_threshold = 80.0;
 
     
-    let queue_name = "metrics_queue";
-    let consume_callback = move |delivery: amqprs::message::DeliveryResult| {
-        match delivery {
-            Ok(delivery) => {
-                let message = String::from_utf8(delivery.body).unwrap();
-                if let Ok(metrics) = serde_json::from_str::<Metrics>(&message) {
-                    tx.send(metrics).unwrap();
-                }
-            }
-            Err(e) => {
-                println!("Error: {:?}", e);
-            }
-        }
-    };
-    let queue_declare_args = QueueDeclareArguments::default();
-    let queue_consume_args = BasicConsumeArguments::default();
-    let queue_bind_args = QueueBindArguments::default();
-    
+    let queue_name = "metrics_queue".to_string();
+    let queue_declare_options = QueueDeclareOptions::default();
+    let queue_consume_options = BasicConsumeOptions::default();
+    let queue_bind_options = QueueBindOptions::default();
+
     channel 
-        .queue_bind(
-            queue_name,
-            "",
-            queue_bind_args,
-            None,
-        )
+        .queue_declare(&queue_name, queue_declare_options, lapin::types::FieldTable::default())
         .await
         .unwrap();
     
-    let consumer = DefaultConsumer::new(
-        consume_callback,
-        None
-    );
-
-    let _consumer_tag = channel
-        .basic_consume(
-            queue_name,
-            consumer,
-            queue_consume_args,
-            queue_declare_args,
-        )
+    channel 
+        .queue_bind(&queue_name, "", "", queue_bind_options, lapin::types::FieldTable::default())
+        .await
+        .unwrap();
+    
+    let mut consumer = channel
+        .basic_consume(&queue_name, "", queue_consume_options, lapin::types::FieldTable::default())
         .await
         .unwrap();
 
@@ -112,15 +82,7 @@ fn main() {
       for line in reader.lines() {
         if let Ok(json_str) = line {
           if let Ok(metrics) = serde_json::from_str::<Metrics>(&json_str) {
-            let message = amqprs::message::BasicPublishMessage::default()
-                .with_body(json_str.as_bytes().to_vec())
-                .with_properties(
-                    amqprs::message::BasicPublishProperties::default()
-                        .with_content_type("application/json".to_string())
-                        .with_delivery_mode(amqprs::message::DeliveryMode::Persistent),
-                );
-            channel.basic_publish(message, "", queue_name).await.unwrap();
-                
+            tx.send(metrics).unwrap();
           }
         }
       }  
@@ -153,14 +115,11 @@ fn main() {
                         network_total += metric.network;
                     }
 
-                    if num_metrics > 0.0 {
-                        let cpu_avg = cpu_total / num_metrics;
-                        let memory_avg = memory_total / num_metrics;
-                        let disk_avg = disk_total / num_metrics;
-                        let network_avg = network_total / num_metrics;
-
-                        println!("CPU: {} Memory: {} Disk: {} Network: {}", cpu_avg, memory_avg, disk_avg, network_avg);
-                    }
+                    let cpu_avg = cpu_total / num_metrics;
+                    let memory_avg = memory_total / num_metrics;
+                    let disk_avg = disk_total / num_metrics;
+                    let network_avg = network_total / num_metrics;
+                    let network_threshold = 50.0;
 
                     if cpu_avg > cpu_threshold {
                         println!("CPU usage is above threshold of {}$", cpu_threshold);
@@ -180,11 +139,17 @@ fn main() {
                     }
                     
                     metrics.clear();
-
+                    // used for debugging: num_metrics = 0.0
                     last_notification = SystemTime::now();
 
                     notify.notify_one();
                 }
+
+                Err(TryRecvError::Disconnected) => {
+                    println!("The channel is disconnected, stopping metrics collection");
+                    break;
+                }
+                
             }
            
         }
