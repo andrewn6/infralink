@@ -59,6 +59,7 @@ fn main() {
     let latency_threshold = 100.0;
     let cpu_threshold = 70.0;
     let memory_threshold = 80.0;
+
     
     let queue_name = "metrics_queue";
     let consume_callback = move |delivery: amqprs::message::DeliveryResult| {
@@ -131,7 +132,7 @@ fn main() {
         let notify = Notify::new();
 
         loop {
-            match rx.try_recv() { 
+            match rs.try_recv() { 
                 Ok(metric) => {
                     metrics.push(metric);
                 }
