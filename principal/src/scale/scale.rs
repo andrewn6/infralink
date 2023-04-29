@@ -133,9 +133,11 @@ fn main() {
 
         loop {
             match rs.try_recv() { 
+
                 Ok(metric) => {
                     metrics.push(metric);
                 }
+
                 Err(mpsc::TryRecvError::Empty) => {
                     let mut cpu_total = 0.0;
                     let mut memory_total = 0.0;
@@ -176,10 +178,8 @@ fn main() {
                     if elapsed_time > latency_threshold {
                         println!("Latency is above threshold of {}ms", latency_threshold);
                     }
-
+                    
                     metrics.clear();
-                    /* Clear metrics after */
-                    num_metrics = 0.0;
 
                     last_notification = SystemTime::now();
 
