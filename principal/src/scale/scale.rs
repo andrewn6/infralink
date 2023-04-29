@@ -141,7 +141,7 @@ fn main() {
                     let mut disk_total = 0.0;
                     let mut network_total = 0.0;
 
-                    let mut nim_metrics = metrics.len() as f64;
+                    let mut num_metrics = metrics.len() as f64;
 
                     for metric in metrics.iter() {
                         cpu_total += metric.cpu;
