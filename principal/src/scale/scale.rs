@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use std::sync::mpsc::{self, TryRecvError};
+use std::sync::mpsc::{self};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
