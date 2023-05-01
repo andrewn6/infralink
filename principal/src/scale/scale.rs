@@ -29,7 +29,7 @@ pub struct Metrics {
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
+pub async fn main() {
     /* Creates a channel to communciate between threads */
     tracing_subscriber::registry()  
         .with(fmt::layer())
@@ -51,7 +51,7 @@ async fn main() {
     let cpu_threshold = 70.0;
     let memory_threshold = 80.0;
 
-    
+        
     let queue_name = "metrics_queue".to_string();
     let queue_declare_options = QueueDeclareOptions::default();
     let queue_consume_options = BasicConsumeOptions::default();
@@ -62,10 +62,10 @@ async fn main() {
         .await
         .unwrap();
     
-    channel 
-        .queue_bind(&queue_name, "", "", queue_bind_options, lapin::types::FieldTable::default())
+    channel.queue_bind(&queue_name, "", &queue_name, queue_bind_options, lapin::types::FieldTable::default())
         .await
         .unwrap();
+
     
     let mut consumer = channel
         .basic_consume(&queue_name, "", queue_consume_options, lapin::types::FieldTable::default())
