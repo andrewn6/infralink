@@ -50,7 +50,7 @@ pub async fn main() {
     let latency_threshold = 100.0;
     let cpu_threshold = 70.0;
     let memory_threshold = 80.0;
-
+    let disk_threshold = 90.0;
         
     let queue_name = "metrics_queue".to_string();
     let queue_declare_options = QueueDeclareOptions::default();
@@ -127,6 +127,10 @@ pub async fn main() {
     
                     if network_avg > network_threshold {
                         println!("Network usage is above threshold of {}$", network_threshold);
+                    }
+
+                    if disk_avg > disk_threshold {
+                        println!("Disk usage above threshold of {}$", disk_threshold);
                     }
     
                     let elapsed_time = last_notification.elapsed().unwrap().as_millis() as f64;
