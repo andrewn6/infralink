@@ -7,12 +7,13 @@ fn main() {
 		"./proto/compute/compute.proto",
 		"./proto/network/network.proto",
 		"./proto/storage/storage.proto",
-		"./proto/helloworld.proto"
+		"./proto/helloworld.proto",
+		// "./proto/container/container.proto"
 	];
 
 	let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-	let proto_paths: Vec<PathBuf> = proto_files.iter().map(|f| PathBuf::from(f)).collect();
+	let proto_paths: Vec<PathBuf> = proto_files.iter().map(PathBuf::from).collect();
 
 	tonic_build::configure()
 		.build_server(true)
