@@ -8,7 +8,7 @@ fn main() {
 		"./proto/network/network.proto",
 		"./proto/storage/storage.proto",
 		"./proto/helloworld.proto",
-		// "./proto/container/container.proto"
+		"./proto/container/container.proto"
 	];
 
 	let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());

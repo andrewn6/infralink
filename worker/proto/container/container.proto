@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package podman_container;
+package podman;
 
 message Container {
   string image = 1;
@@ -12,7 +12,6 @@ message Container {
 message Pod {
   repeated Container containers = 1;
 }
-
 
 message StartContainerRequest {
   string name = 1;
@@ -30,8 +29,12 @@ message StopContainerResponse {
   string message = 1;
 }
 
+message CreatePodResponse {
+  string message = 1;
+}
+
 service Podman {
-  rpc CreatePod (Pod) returns (string) {}
-  rpc StartContainer (StartContainerRequest) returns (StartContainerResponse) {}
-  rpc StopContainer (StopContainerRequest) returns (StopContainerResponse) {}
-};
+  rpc CreatePod (Pod) returns (CreatePodResponse);
+  rpc StartContainer (StartContainerRequest) returns (StartContainerResponse);
+  rpc StopContainer (StopContainerRequest) returns (StopContainerResponse);
+}

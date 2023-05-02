@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use podman_api::api::Container;
 use podman_api::models::ContainerStats;
-use podman_api::opts::ContainerStatsOpts;
-use podman_api::opts::ContainerListOpts;
 use podman_api::models::ContainerStats200Response;
 use podman_api::Podman;
 
@@ -25,7 +22,6 @@ use tonic::{transport::Server, Request, Response, Status};
 // use proto_storage::StorageMetadata;
 
 // use std::sync::Arc;
-pub mod resource;
 use hello_world::greeter_server::{Greeter, GreeterServer};
 use hello_world::{HelloReply, HelloRequest};
 
@@ -66,6 +62,7 @@ pub struct NetworkServiceImpl {}
 
 #[derive(Default)]
 pub struct MyGreeter {}
+
 
 #[tonic::async_trait]
 impl Greeter for MyGreeter {
