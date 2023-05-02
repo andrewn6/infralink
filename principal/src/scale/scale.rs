@@ -8,6 +8,9 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::Notify;
 use serde::{Deserialize, Serialize};
 
+use std::net::SocketAddr;
+use std::str::FromStr;
+
 use tracing::{info, error};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::fmt;
@@ -28,6 +31,8 @@ pub struct Metrics {
     time: SystemTime,
 }
 
+
+
 #[tokio::main(flavor = "current_thread")]
 pub async fn main() {
     /* Creates a channel to communciate between threads */
@@ -36,10 +41,15 @@ pub async fn main() {
         .try_init()
         .ok();
 
-    let addr = "amqp://guest:guest@localhost:5672/%2F";
+    let addr = "amqp://andrew:rabbitmqlatest@localhost:5672";
     let conn = Connection::connect(&addr, ConnectionProperties::default())
         .await
-        .unwrap();
+        .unwrap_or_else(|error| {
+            error!("Problem connecting to RabbitMQ: {:?}", error);
+            std::process::exit(1) // sure, exit instead of panic
+           });
+    
+    
     info!("Connected to RabbitMQ");
 
     let (tx, rs) = mpsc::channel::<Metrics>();
