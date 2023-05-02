@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 fn main() {
 	let proto_files = vec![
-		"./proto/memory.proto",
-		"./proto/compute.proto",
-		"./proto/network.proto",
-		"./proto/storage.proto",
+		"./proto/memory/memory.proto",
+		"./proto/compute/compute.proto",
+		"./proto/network/network.proto",
+		"./proto/storage/storage.proto",
 		"./proto/helloworld.proto"
 	];
 
