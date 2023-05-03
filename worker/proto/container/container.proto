@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package podman;
+
+message Container {
+  string image = 1;
+  string name = 2;
+  repeated string commands = 3;
+  repeated string ports = 4;
+}
+
+message Pod {
+  repeated Container containers = 1;
+}
+
+message StartContainerRequest {
+  string name = 1;
+}
+
+message StartContainerResponse {
+  string message = 1;
+}
+
+message StopContainerRequest {
+  string name = 1;
+}
+
+message StopContainerResponse {
+  string message = 1;
+}
+
+message CreatePodResponse {
+  string message = 1;
+}
+
+service Podman {
+  rpc CreatePod (Pod) returns (CreatePodResponse);
+  rpc StartContainer (StartContainerRequest) returns (StartContainerResponse);
+  rpc StopContainer (StopContainerRequest) returns (StopContainerResponse);
+}

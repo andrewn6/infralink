@@ -6,8 +6,8 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::Notify;
 
+use tokio::sync::Notify;
 use tracing::{error, info};
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::*;
@@ -26,7 +26,7 @@ pub struct Metrics {
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
+pub async fn main() {
 	// Creates a channel to communciate between threads
 	tracing_subscriber::registry()
 		.with(fmt::layer())
