@@ -28,6 +28,8 @@ mod container {
     pub mod create;
 }
 
+use container::create::ContainerCreateService;
+
 mod hello_world {
     include!("helloworld.rs");
 }
@@ -124,6 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Server::builder()
         .add_service(GreeterServer::new(greeter))
 		.add_service(reflection_service)
+        .add_service(ContainerCreateService::default())
         .serve(addr)
         .await?;
 
