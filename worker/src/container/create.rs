@@ -1,19 +1,19 @@
 use std::convert::TryInto;
 use std::env;
 use std::collections::HashMap;
-ise std::path::PathBuf;
+use std::path::PathBuf;
 
 use tonic::transport::Channel;
 use tokio::runtime::Runtime;
 
 // Podman rust bindings
 use podman_api::Podman;
-use podman_api::models::{CreateContainerResponse}
+use podman_api::models::{CreateContainerResponse};
 use podman_api::models::PortMapping;
 use podman_api::opts::ContainerCreateOpts;
 
 pub mod podman {
-    tonic::include_proto!("../podman");
+    tonic::include_proto!("./podman");
 }
 // Imports from generated protobuf to Rust.
 use podman::{PodmanClient, Container, CreatePodResponse, Pod, StartContainerRequest, StartContainerResponse};
@@ -90,7 +90,7 @@ impl Container for ContainerCreateService {
         };
 
         Ok(Response::new(create_pod_response))
-    };
+    }
 
     async fn start_container(
         &self,
