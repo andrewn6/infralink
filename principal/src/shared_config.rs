@@ -6,6 +6,7 @@ pub struct SharedConfig {
 
 pub struct ProviderClients {
 	pub vultr: Option<Client>,
+	pub hetzner: Option<Client>,
 }
 
 impl ProviderClients {
@@ -16,6 +17,16 @@ impl ProviderClients {
 			self.vultr.unwrap()
 		} else {
 			self.vultr.unwrap()
+		}
+	}
+
+	pub fn hetzner(mut self) -> Client {
+		if self.hetzner.is_none() {
+			self.hetzner = Some(Client::builder().use_rustls_tls().build().unwrap());
+
+			self.hetzner.unwrap()
+		} else {
+			self.hetzner.unwrap()
 		}
 	}
 }

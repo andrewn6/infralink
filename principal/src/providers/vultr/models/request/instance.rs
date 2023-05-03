@@ -266,7 +266,7 @@ impl InstanceBuilder {
 		self
 	}
 
-	pub async fn create(self, shared_config: SharedConfig) -> Instance {
+	pub async fn build(self, shared_config: SharedConfig) -> Instance {
 		shared_config
 			.clients
 			.vultr()
