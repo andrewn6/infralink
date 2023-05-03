@@ -1,5 +1,8 @@
 use std::convert::TryInto;
 use std::env;
+use std::collections::HashMap;
+ise std::path::PathBuf;
+
 use tonic::transport::Channel;
 use tokio::runtime::Runtime;
 
@@ -7,14 +10,22 @@ use tokio::runtime::Runtime;
 use podman_api::Podman;
 use podman_api::models::{CreateContainerResponse}
 use podman_api::models::PortMapping;
-use podman_api::opts::ContainerCreateOpts
+use podman_api::opts::ContainerCreateOpts;
 
 pub mod podman {
     tonic::include_proto!("../podman");
 }
-
 // Imports from generated protobuf to Rust.
 use podman::{PodmanClient, Container, CreatePodResponse, Pod, StartContainerRequest, StartContainerResponse};
+
+struct ContainerCreateInfo {
+    image: String,
+    name: String,
+    cmd: Vec<String>,
+    env: HashMap<String, String>,
+    ports: Vec<PortMapping>,
+}
+
 
 fn get_socket_path() -> Result<PathBuf, std::io::Error> {
     let path = env::var("PODMAN_SOCKET_PATH").unwrap_or("/var/run/podman/podman.sock".to_string());
@@ -94,9 +105,4 @@ impl Container for ContainerCreateService {
             .ok_or_else(|| Status::invalid_argument("Container name must be specified"))?;
         let response = client.containers.get(&container_id).start(None).await?;
     }
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    
 }
