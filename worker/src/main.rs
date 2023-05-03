@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use podman_api::models::ContainerStats;
-use podman_api::models::ContainerStats200Response;
 use podman_api::Podman;
-
+use podman_api::models::ContainerStats200Response;
 use tonic::{transport::Server, Request, Response, Status};
 // use tonic::{Request, Response, Status};
 
@@ -88,7 +87,7 @@ trait GetStats {
 impl GetStats for ContainerStats {
     async fn get_stats(&self, request: Request<()>) -> Result<Response<HashMap<String, String>>, Status> {
         let mut stats_result: HashMap<String, String> = HashMap::new();
-		
+
 		// Change this accordingle
         let podman = Podman::unix("unix:///var/run/podman/podman.sock");
         let container_stats_opts = podman_api::opts::ContainerStatsOpts::default();

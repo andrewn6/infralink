@@ -7,6 +7,7 @@ message Container {
   string name = 2;
   repeated string commands = 3;
   repeated string ports = 4;
+  map<string, string> env = 5;
 }
 
 message Pod {
@@ -14,7 +15,7 @@ message Pod {
 }
 
 message StartContainerRequest {
-  string name = 1;
+  string container_id = 1;
 }
 
 message StartContainerResponse {
