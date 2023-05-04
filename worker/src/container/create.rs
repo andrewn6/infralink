@@ -1,108 +1,136 @@
-use std::convert::TryInto;
-use std::env;
+/*
+   gRPC service that interacts with Podman, it creates containers & starts them.
+   uses podman_api crate to interact with Podman.
+*/
 use std::collections::HashMap;
+use std::env;
 use std::path::PathBuf;
 
-use tonic::transport::Channel;
-use tokio::runtime::Runtime;
+use podman_api::models::ContainerCreateCreatedBody;
+use podman_api::models::ContainerCreateResponse;
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 
 // Podman rust bindings
-use podman_api::Podman;
-use podman_api::models::{CreateContainerResponse};
+use podman_api::models::Container;
+use podman_api::models::CreateContainerConfig;
 use podman_api::models::PortMapping;
 use podman_api::opts::ContainerCreateOpts;
+use podman_api::Podman;
 
-pub mod podman {
-    tonic::include_proto!("./podman");
+mod podman {
+	include!("../podman.rs");
 }
 // Imports from generated protobuf to Rust.
-use podman::{PodmanClient, Container, CreatePodResponse, Pod, StartContainerRequest, StartContainerResponse};
-
-struct ContainerCreateInfo {
-    image: String,
-    name: String,
-    cmd: Vec<String>,
-    env: HashMap<String, String>,
-    ports: Vec<PortMapping>,
-}
-
-
-fn get_socket_path() -> Result<PathBuf, std::io::Error> {
-    let path = env::var("PODMAN_SOCKET_PATH").unwrap_or("/var/run/podman/podman.sock".to_string());
-    Ok(PathBuf::from(path))
-}
+use podman::{CreatePodResponse, Pod, StartContainerRequest, StartContainerResponse};
 
 #[derive(Default)]
-pub struct ContainerCreateService {}
+struct ContainerCreateInfo {
+	image: String,
+	name: String,
+	cmd: Vec<String>,
+	env: HashMap<String, String>,
+	ports: Vec<PortMapping>,
+}
 
-impl Container for ContainerCreateService {
-    async fn create_pod(
-        &self,
-        request: Request<Pod>,
-    ) -> Result<Response<CreatePodResponse>, Status> {
-        let socket_path = get_socket_path()?;
-        let mut client = Podman::unix(&socket_path);
+#[tonic::async_trait]
+pub trait ContainerCreateService {
+	async fn create_pod(
+		&self,
+		request: Request<CreatePodResponse>,
+	) -> Result<Response<StartContainerResponse>, Status>;
 
-        let create_pod_request = request.into_inner();
+	async fn start_container(
+		&self,
+		request: Request<StartContainerRequest>,
+	) -> Result<Response<StartContainerResponse>, Status>;
+}
+fn get_socket_path() -> Result<PathBuf, std::io::Error> {
+	let path = env::var("PODMAN_SOCKET_PATH").unwrap_or("/var/run/podman/podman.sock".to_string());
+	Ok(PathBuf::from(path))
+}
 
-        let container = create_pod_request.containers.first().ok_or_else(|| {
-            Status::invalid_argument("One container must be specified")
-        })?;
+impl dyn ContainerCreateService {
+	async fn create_pod(
+		&self,
+		request: Request<Pod>,
+	) -> Result<Response<CreatePodResponse>, Status> {
+		let socket_path = get_socket_path()?;
+		let mut client = Podman::unix(&socket_path);
 
-        let image = container.image.clone();
-        let name = container.name.clone();
-        let commands = container.commands.clone();
-        let ports = container.port.clone();
-        let env = container.env.clone();
+		let create_pod_request = request.into_inner();
 
-        let create_container_info = ContainerCreateInfo {
-            image: Some(image),
-            name: Some(name),
-            cmd: Some(commands),
-            env: HashMap::new(),
-            ports: ports
-                .iter()
-                .map(|port_str| {
-                    let port = port_str.parse().map_err(|_| {
-                        Status::invalid_argument(format!("Invalid port: {}", port_str))
-                    })?;
-                    Ok(PortMapping {
-                        host_ip: None,
-                        host_port: Some(port),
-                        container_port: Some(port),
-                        protocol: Some("tcp".to_owned()),
-                        ..Default::default()
-                    })
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-            ..Default::default()
-        };
+		let container = create_pod_request
+			.containers
+			.first()
+			.ok_or_else(|| Status::invalid_argument("One container must be specified"))?;
 
-        let create_container_opts = ContainerCreateOpts::builder()
-            .create_info(create_container_info)
-            .build();
+		let image = container.image.clone();
+		let name = container.name.clone();
+		let commands = container.commands.clone();
+		let ports = container.ports.clone();
+		let env = container.env.clone();
 
-        let response = client.containers().create(&create_container_opts).await?;
-        let create_container_response: CreateContainerResponse = response.into_inner();
+		let create_container_info = ContainerCreateInfo {
+			image,
+			name,
+			cmd: commands,
+			env: HashMap::new(),
+			ports: ports
+				.iter()
+				.map(|port_str| {
+					let port = port_str.parse().map_err(|_| {
+						Status::invalid_argument(format!("Invalid port: {}", port_str))
+					})?;
+					Ok(PortMapping {
+						host_ip: None,
+						host_port: Some(port),
+						container_port: Some(port),
+						protocol: Some("tcp".to_owned()),
+						range: Some(0),
+					})
+				})
+				.collect::<Result<Vec<_>, _>>()?,
+			..Default::default()
+		};
 
-        let create_pod_response = CreatePodResponse {
-            containers: vec![create_container_response],
-        };
+		let create_container_opts = ContainerCreateOpts::builder()
+			.create(create_container_info)
+			.build();
 
-        Ok(Response::new(create_pod_response))
-    }
+		let response = client.containers().create(&create_container_opts);
+		let create_container_response: ContainerCreateCreatedBody = match response.await {
+			Ok(x) => x,
+			Err(err) => {
+				return Err(Status::internal(format!(
+					"Failed to create container: {}",
+					err
+				)))
+			}
+		};
+		let create_pod_response = CreatePodResponse {
+			message: vec![create_container_response]
+				.into_iter()
+				.map(|container| container.id)
+				.collect()
+				.join(",")
+				.into(),
+		};
 
-    async fn start_container(
-        &self,
-        request: Request<StartContainerRequest>,
-    ) -> Result<Response<StartContainerResponse>, Status> {
-        socket_path = get_socket_path()?;
-        let mut client = Podman::unix(&socket_path);
+		Ok(Response::new(create_pod_response))
+	}
 
-        let container_id = request
-            .into_inner()
-            .name
-            .ok_or_else(|| Status::invalid_argument("Container name must be specified"))?;
-        let response = client.containers.get(&container_id).start(None).await?;
-    }
+	fn start_container(
+		&self,
+		request: Request<StartContainerRequest>,
+	) -> Result<Response<StartContainerResponse>, Status> {
+		let socket_path = get_socket_path()?;
+		let mut client = Podman::unix(&socket_path);
+
+		let container_id = request
+			.into_inner();
+	
+		let response = client.containers().get(&container_id).start(None).await?;
+	}
 }
