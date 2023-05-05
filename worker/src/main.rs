@@ -126,7 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Server::builder()
         .add_service(GreeterServer::new(greeter))
 		.add_service(reflection_service)
-        .add_service(ContainerCreateService::default())
+        .add_service(<dyn ContainerCreateService>::std::default())
         .serve(addr)
         .await?;
 

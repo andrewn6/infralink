@@ -7,14 +7,11 @@ use std::env;
 use std::path::PathBuf;
 
 use podman_api::models::ContainerCreateCreatedBody;
-use podman_api::models::ContainerCreateResponse;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
 
 // Podman rust bindings
-use podman_api::models::Container;
-use podman_api::models::CreateContainerConfig;
 use podman_api::models::PortMapping;
 use podman_api::opts::ContainerCreateOpts;
 use podman_api::Podman;
@@ -46,6 +43,7 @@ pub trait ContainerCreateService {
 		request: Request<StartContainerRequest>,
 	) -> Result<Response<StartContainerResponse>, Status>;
 }
+
 fn get_socket_path() -> Result<PathBuf, std::io::Error> {
 	let path = env::var("PODMAN_SOCKET_PATH").unwrap_or("/var/run/podman/podman.sock".to_string());
 	Ok(PathBuf::from(path))
@@ -96,8 +94,9 @@ impl dyn ContainerCreateService {
 		};
 
 		let create_container_opts = ContainerCreateOpts::builder()
-			.create(create_container_info)
-			.build();
+            .image("my_image_name_or_id")
+            .build();
+
 
 		let response = client.containers().create(&create_container_opts);
 		let create_container_response: ContainerCreateCreatedBody = match response.await {
@@ -113,24 +112,42 @@ impl dyn ContainerCreateService {
 			message: vec![create_container_response]
 				.into_iter()
 				.map(|container| container.id)
-				.collect()
+				.collect::<Vec<_>>()
 				.join(",")
-				.into(),
+				.into()
 		};
 
 		Ok(Response::new(create_pod_response))
 	}
 
-	fn start_container(
-		&self,
-		request: Request<StartContainerRequest>,
-	) -> Result<Response<StartContainerResponse>, Status> {
-		let socket_path = get_socket_path()?;
-		let mut client = Podman::unix(&socket_path);
+	async fn start_container(
+        &self,
+        request: Request<StartContainerRequest>,
+    ) -> Result<Response<StartContainerResponse>, Status> {
+        let socket_path = get_socket_path()?;
+        let mut client = Podman::unix(&socket_path);
+		
+		let container_id = request.into_inner().container_id;
 
-		let container_id = request
-			.into_inner();
+		let response = client.containers().get(&container_id).start(None);
+
+    
+        // Convert the response to the expected type
+		
+        let start_container_response = StartContainerResponse {
+            message: response
+				.await
+                .into_iter()
+                .map(|container| container.id)
+                .collect()
+                .join(",")
+                .into(),
+        };  
+		
+        let response = Response::new(start_container_response);
+    
+        Ok(response)
+    }
+    
 	
-		let response = client.containers().get(&container_id).start(None).await?;
-	}
 }
