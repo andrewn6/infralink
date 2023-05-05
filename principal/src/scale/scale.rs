@@ -33,10 +33,12 @@ pub async fn main() {
 		.try_init()
 		.ok();
 
-	let addr = "amqp://guest:guest@localhost:5672/%2F";
+	let addr = "amqp://myuser:mypass@localhost:5672/%2f";
+
 	let conn = Connection::connect(&addr, ConnectionProperties::default())
 		.await
 		.unwrap();
+
 	info!("Connected to RabbitMQ");
 
 	let (tx, rs) = mpsc::channel::<Metrics>();
@@ -65,8 +67,8 @@ pub async fn main() {
 	channel
 		.queue_bind(
 			&queue_name,
-			"",
-			"",
+			"amq.direct", // use the default exchange
+			&queue_name,  // set the routing key to the queue's name
 			queue_bind_options,
 			lapin::types::FieldTable::default(),
 		)
