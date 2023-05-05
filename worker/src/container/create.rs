@@ -89,9 +89,10 @@ impl dyn ContainerCreateService {
 						range: Some(0),
 					})
 				})
-				.collect::<Result<Vec<_>, _>>()?,
+				.collect::<Result<Vec<_>, podman_api::errors::Error>>()?,
 			..Default::default()
 		};
+		
 
 		let create_container_opts = ContainerCreateOpts::builder()
             .image("my_image_name_or_id")
@@ -125,29 +126,30 @@ impl dyn ContainerCreateService {
         request: Request<StartContainerRequest>,
     ) -> Result<Response<StartContainerResponse>, Status> {
         let socket_path = get_socket_path()?;
-        let mut client = Podman::unix(&socket_path);
+        let client = Podman::unix(&socket_path);
 		
 		let container_id = request.into_inner().container_id;
 
-		let response = client.containers().get(&container_id).start(None);
+		let container = client.containers().get(container_id.to_owned());
+		let response = container.start(None);
 
     
         // Convert the response to the expected type
 		
-        let start_container_response = StartContainerResponse {
-            message: response
-				.await
-                .into_iter()
-                .map(|container| container.id)
-                .collect()
-                .join(",")
-                .into(),
-        };  
+		let start_container_response = match response.await {
+			Ok(response) => {
+				StartContainerResponse {
+				  message: container_id
+				}
+			  }
+			Err(err) => {
+				println!("Could not start container: {}", err);
+				return Err(Status::internal("Failed to start container"));
+			}
+		};
 		
         let response = Response::new(start_container_response);
     
         Ok(response)
     }
-    
-	
 }
