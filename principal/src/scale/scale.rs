@@ -1,19 +1,22 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::sync::atomic::{AtomicUsize};
+use std::sync::atomic::Ordering as OtherOrdering;
 
+use std::sync::Arc;
 use std::sync::mpsc::{self};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+use lapin::types::FieldTable;
 use serde::{Deserialize, Serialize};
 
 use tokio::sync::Notify;
+use tokio::time::{self};
 use tracing::{error, info};
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::*;
 
-use lapin::options::{BasicConsumeOptions, QueueBindOptions, QueueDeclareOptions};
-use lapin::{Connection, ConnectionProperties};
+use lapin::options::{QueueBindOptions, QueueDeclareOptions, BasicAckOptions, BasicGetOptions};
+use lapin::{Connection, ConnectionProperties, Channel};
 
 // Holds metric data
 #[derive(Debug, Deserialize, Serialize)]
@@ -25,6 +28,125 @@ pub struct Metrics {
 	time: SystemTime,
 }
 
+#[derive(Debug)]
+pub struct WorkerState {
+	pub id: usize,
+	pub channel: Channel,
+	pub notify: Arc<Notify>,
+}
+
+fn worker(id: usize, rx: mpsc::Receiver<Metrics>, notify: Arc<Notify>) -> Metrics {
+	loop {
+        let metrics = match rx.recv() {
+            Ok(metrics) => metrics,
+            Err(_) => {
+                error!("Worker {} failed to receive metrics", id);
+                continue;
+            }
+        };
+
+        let sleep_time = Duration::from_millis(rand::random::<u64>() % 5000);
+        thread::sleep(sleep_time);
+
+        notify.notify_one();
+        return metrics; 
+    }
+}
+
+async fn spawn_worker(
+    channel: lapin::Channel,
+    id: usize,
+    rx: std::sync::mpsc::Receiver<Metrics>,
+	tx: &std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Sender<Metrics>>>,
+    notify: Arc<tokio::sync::Notify>,
+) -> Result<WorkerState, Box<dyn std::error::Error + Send + Sync>> {
+    let cloned_notify = notify.clone();
+
+    let worker_task = tokio::spawn(async move {
+        let handle = std::thread::spawn(move || {
+            let metrics = worker(id, rx, cloned_notify);
+            metrics
+        });
+
+        let metrics = handle.join().unwrap();
+
+        info!("Worker{} stopped", id);
+
+        channel
+            .basic_ack(0, BasicAckOptions::default())
+            .await
+            .unwrap();
+
+        tx.send(metrics).unwrap();
+
+        channel
+    }); 
+
+    let channel = worker_task.await.unwrap();
+
+    Ok(WorkerState {
+        id,
+        channel,
+        notify,
+    })
+}
+
+async fn scale_up(
+	id: usize,
+    rx: mpsc::Receiver<Metrics>,
+    tx: &std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Sender<Metrics>>>,
+    notify: Arc<tokio::sync::Notify>,
+    conn: &Connection,
+    channel: &Channel,
+    num_workers: &mut usize,
+) -> Result<WorkerState, Box<dyn std::error::Error + Send + Sync>> {
+    let max_workers = 10;
+    if *num_workers < max_workers {
+        let worker_id = *num_workers;
+        *num_workers += 1;
+        info!("Scaling up! creating worker{}", worker_id);
+
+        let queue_name = format!("worker{}", worker_id);
+        let queue_declare_options = QueueDeclareOptions::default();
+        let queue_bind_options = QueueBindOptions::default();
+
+        channel    
+            .queue_declare(
+                &queue_name,
+                queue_declare_options,
+                lapin::types::FieldTable::default(),
+            )
+            .await?;
+
+        channel
+            .queue_bind(
+                &queue_name,
+                "amq.direct",
+                &queue_name,
+                queue_bind_options,
+                lapin::types::FieldTable::default(),
+            )
+            .await?;
+
+		let (tx, rx) = mpsc::channel::<Metrics>();
+
+		let notify = Arc::new(tokio::sync::Notify::new());
+		let worker_mut = spawn_worker(channel.clone(), worker_id, rx, tx, notify.clone());
+
+		
+		tokio::spawn(worker_mut);
+        info!("scaled up, worker {} created", worker_id);
+    } else  {
+        info!("can't scale up more! max num of workers reached");
+    }
+
+    Ok(WorkerState {
+		id,
+		channel: channel.clone(),
+		notify: notify.clone(),
+	})
+} 
+
 #[tokio::main(flavor = "current_thread")]
 pub async fn main() {
 	// Creates a channel to communciate between threads
@@ -35,129 +157,82 @@ pub async fn main() {
 
 	let addr = "amqp://myuser:mypass@localhost:5672/%2f";
 
-	let conn = Connection::connect(&addr, ConnectionProperties::default())
+	let conn = Connection::connect(addr, ConnectionProperties::default())
 		.await
 		.unwrap();
 
 	info!("Connected to RabbitMQ");
 
-	let (tx, rs) = mpsc::channel::<Metrics>();
 	let channel = conn.create_channel().await.unwrap();
-
-	// Set thresholds for latency and request rates
-	let request_rate_threshold = 10.0;
-	let latency_threshold = 100.0;
-	let cpu_threshold = 70.0;
-	let memory_threshold = 80.0;
-
-	let queue_name = "metrics_queue".to_string();
-	let queue_declare_options = QueueDeclareOptions::default();
-	let queue_consume_options = BasicConsumeOptions::default();
-	let queue_bind_options = QueueBindOptions::default();
-
-	channel
-		.queue_declare(
-			&queue_name,
-			queue_declare_options,
-			lapin::types::FieldTable::default(),
-		)
+	let num_workers = AtomicUsize::new(0);
+	let (tx, rx) = mpsc::channel::<Metrics>(); 
+	let tx = std::sync::Arc::new(std::sync::Mutex::new(tx)); 
+	let notify = Arc::new(Notify::new());
+	
+	let queue = channel	
+		.queue_declare("worker", QueueDeclareOptions::default(), FieldTable::default())
+		.await
+		.unwrap();
+	let worker_state = spawn_worker(channel, 0, rx, &tx, notify)
 		.await
 		.unwrap();
 
-	channel
-		.queue_bind(
-			&queue_name,
-			"amq.direct", // use the default exchange
-			&queue_name,  // set the routing key to the queue's name
-			queue_bind_options,
-			lapin::types::FieldTable::default(),
-		)
-		.await
-		.unwrap();
+		num_workers.fetch_add(1, OtherOrdering::SeqCst);
+	
+	let mut interval = time::interval(Duration::from_secs(5));
 
-	let mut consumer = channel
-		.basic_consume(
-			&queue_name,
-			"",
-			queue_consume_options,
-			lapin::types::FieldTable::default(),
-		)
-		.await
-		.unwrap();
+	const MAX_WORKERS: usize = 10;
+	let num_workers = AtomicUsize::new(0);
 
-	// Spawn a thread to read data from a file and send it over the channel (this will be replaced with a Podman container in the future)
-	thread::spawn(move || {
-		let file = File::open("../data/dummy_data.json").unwrap();
-		let reader = BufReader::new(file);
-
-		for line in reader.lines() {
-			if let Ok(json_str) = line {
-				if let Ok(metrics) = serde_json::from_str::<Metrics>(&json_str) {
-					tx.send(metrics).unwrap();
-				}
-			}
+	loop {
+		interval.tick().await;
+	
+		let num_workers_value = num_workers.load(OtherOrdering::SeqCst);
+		if num_workers_value >= MAX_WORKERS {
+			continue;
 		}
-	});
+	
+		let num_workers = AtomicUsize::new(0);
+	
+		tokio::spawn(async move {
+			let worker_state = scale_up(
+					num_workers_value,
+					rx,
+					&tx,
+					notify.clone(), 
+					&conn,
+					&channel.clone(),
+					&mut num_workers.load(OtherOrdering::Relaxed),
+				)
+				.await;
+				
+				if let Ok(worker_state) = worker_state {
+					let mut interval = time::interval(Duration::from_secs(5));
 
-	thread::spawn(move || {
-		let mut metrics = Vec::<Metrics>::new();
-		let mut last_notification = SystemTime::now();
-		let notify = Notify::new();
+					loop {
+						interval.tick().await;
 
-		loop {
-			match rs.try_recv() {
-				Ok(metric) => {
-					metrics.push(metric);
+						let metrics = worker_state
+							.channel
+							.basic_get("worker", BasicGetOptions::default())
+							.await
+							.unwrap();
+						
+							if let Ok(Some(delivery)) = worker_state.channel.basic_get("worker", BasicGetOptions::default()).await {
+								let metrics: Metrics = serde_json::from_slice(&delivery.data).unwrap();
+								tx.lock()
+									.unwrap()
+									.send(metrics)
+									.unwrap_or_else(|err| error!("Failed to send metrics: {}", err));
+							}
+
+							let _guard = notify.notified().await;
+
+							break;
+					}
 				}
-				Err(mpsc::TryRecvError::Empty) => {
-					let mut cpu_total = 0.0;
-					let mut memory_total = 0.0;
-					let mut disk_total = 0.0;
-					let mut network_total = 0.0;
-
-					let num_metrics = metrics.len() as f64;
-
-					for metric in metrics.iter() {
-						cpu_total += metric.cpu;
-						memory_total += metric.memory;
-						disk_total += metric.disk;
-						network_total += metric.network;
-					}
-
-					let cpu_avg = cpu_total / num_metrics;
-					let memory_avg = memory_total / num_metrics;
-					let disk_avg = disk_total / num_metrics;
-					let network_avg = network_total / num_metrics;
-					let network_threshold = 50.0;
-
-					if cpu_avg > cpu_threshold {
-						println!("CPU usage is above threshold of {}$", cpu_threshold);
-					}
-
-					if memory_avg > memory_threshold {
-						println!("Memory usage is above threshold of {}$", memory_threshold);
-					}
-
-					if network_avg > network_threshold {
-						println!("Network usage is above threshold of {}$", network_threshold);
-					}
-
-					let elapsed_time = last_notification.elapsed().unwrap().as_millis() as f64;
-					if elapsed_time > latency_threshold {
-						println!("Latency is above threshold of {}ms", latency_threshold);
-					}
-
-					metrics.clear();
-					last_notification = SystemTime::now();
-
-					notify.notify_one();
-				}
-				Err(mpsc::TryRecvError::Disconnected) => {
-					error!("The channel is disconnected, stopping metrics collection");
-					break;
-				}
-			}
-			std::thread::sleep(Duration::from_millis(1000));
-		}
-	});
+		});
+		num_workers.fetch_add(1, OtherOrdering::SeqCst);
+	}
+		
 }
