@@ -4,7 +4,9 @@ use podman_api::opts::ContainerDeleteOpts;
 use std::env;
 use std::path::PathBuf;
 
-use tonic::{Request, Response, Status};
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 
 mod podman {
 	include!("../podman.rs");
@@ -25,7 +27,7 @@ fn get_socket_path() -> Result<PathBuf, std::io::Error> {
 	Ok(PathBuf::from(path))
 }
 
-pub struct ContainerDeleteServiceImpl;
+pub struct ContainerDeleteServiceImpl {};
 
 #[tonic::async_trait]
 impl ContainerDeleteService for ContainerDeleteServiceImpl {
@@ -43,7 +45,7 @@ impl ContainerDeleteService for ContainerDeleteServiceImpl {
         	.build();
 
 		let container = client.containers().get(&container_id.to_owned());
-		let response = client.containers().delete(&ContainerDeleteOpts::builder().volumes(true).build());
+		let response = containers().delete(&ContainerDeleteOpts::builder().volumes(true).build());
 
 		let delete_container_response = match response.await {
 			Ok(response) => {

@@ -20,7 +20,7 @@ mod podman {
 	include!("../podman.rs");
 }
 // Imports from generated protobuf to Rust.
- use podman::{CreatePodResponse, Pod, StartContainerRequest, StartContainerResponse};
+use podman::{CreatePodResponse, Pod, StartContainerRequest, StartContainerResponse};
 
 #[derive(Default)]
  struct ContainerCreateInfo {
@@ -32,7 +32,7 @@ mod podman {
 }
 
 #[tonic::async_trait]
- pub trait ContainerCreateService {
+pub trait ContainerCreateService {
  	async fn create_pod(
  		&self,
 		request: Request<CreatePodResponse>,
