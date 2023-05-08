@@ -3,6 +3,7 @@
    uses podman_api crate to interact with Podman.
 */
 use std::collections::HashMap;
+
 use std::env;
 use std::path::PathBuf;
 
@@ -55,7 +56,7 @@ impl dyn ContainerCreateService {
 		request: Request<Pod>,
 	) -> Result<Response<CreatePodResponse>, Status> {
 		let socket_path = get_socket_path()?;
-		let mut client = Podman::unix(&socket_path);
+		let client = Podman::unix(&socket_path);
 
 		let create_pod_request = request.into_inner();
 
@@ -89,17 +90,20 @@ impl dyn ContainerCreateService {
 						range: Some(0),
 					})
 				})
-				.collect::<Result<Vec<_>, podman_api::errors::Error>>()?,
+				.collect::<Result<Vec<PortMapping>, Status>>()?,
 			..Default::default()
 		};
-		
+		let ports = create_container_info.ports.clone();
 
 		let create_container_opts = ContainerCreateOpts::builder()
-            .image("my_image_name_or_id")
-            .build();
+    		.image(&create_container_info.image)
+    		.name(&create_container_info.name)
+    		.command(create_container_info.cmd)
+    		.env(create_container_info.env)
+    		.build();
 
-
-		let response = client.containers().create(&create_container_opts);
+		let containers = client.containers();
+		let response = containers.create(&create_container_opts);
 		let create_container_response: ContainerCreateCreatedBody = match response.await {
 			Ok(x) => x,
 			Err(err) => {
