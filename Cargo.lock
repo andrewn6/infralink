@@ -1594,6 +1594,7 @@ dependencies = [
  "dotenv",
  "dotenv_codegen",
  "lapin",
+ "rand",
  "reqwest",
  "serde",
  "serde_json",
