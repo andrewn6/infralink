@@ -34,8 +34,17 @@ message CreatePodResponse {
   string message = 1;
 }
 
+message DeleteContainerRequest {
+  string container_id = 1;
+}
+
+message DeleteContainerResponse {
+  string message = 1;
+}
+
 service Podman {
   rpc CreatePod (Pod) returns (CreatePodResponse);
   rpc StartContainer (StartContainerRequest) returns (StartContainerResponse);
   rpc StopContainer (StopContainerRequest) returns (StopContainerResponse);
+  rpc DeleteContainer (DeleteContainerRequest) returns (DeleteContainerResponse);
 }
