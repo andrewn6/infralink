@@ -15,15 +15,7 @@ use tracing_subscriber::prelude::*;
 use lapin::options::{BasicConsumeOptions, QueueBindOptions, QueueDeclareOptions};
 use lapin::{Connection, ConnectionProperties};
 
-// Holds metric data
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Metrics {
-	cpu: f64,
-	memory: f64,
-	disk: f64,
-	network: f64,
-	time: SystemTime,
-}
+use crate::models::metrics::Metrics;
 
 #[tokio::main(flavor = "current_thread")]
 pub async fn main() {

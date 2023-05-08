@@ -51,18 +51,6 @@ pub struct CreatePodResponse {
     #[prost(string, tag = "1")]
     pub message: ::prost::alloc::string::String,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DeleteContainerRequest {
-    #[prost(string, tag = "1")]
-    pub container_id: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DeleteContainerResponse {
-    #[prost(string, tag = "1")]
-    pub message: ::prost::alloc::string::String,
-}
 /// Generated client implementations.
 pub mod podman_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -187,25 +175,6 @@ pub mod podman_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn delete_container(
-            &mut self,
-            request: impl tonic::IntoRequest<super::DeleteContainerRequest>,
-        ) -> Result<tonic::Response<super::DeleteContainerResponse>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/podman.Podman/DeleteContainer",
-            );
-            self.inner.unary(request.into_request(), path, codec).await
-        }
     }
 }
 /// Generated server implementations.
@@ -227,10 +196,6 @@ pub mod podman_server {
             &self,
             request: tonic::Request<super::StopContainerRequest>,
         ) -> Result<tonic::Response<super::StopContainerResponse>, tonic::Status>;
-        async fn delete_container(
-            &self,
-            request: tonic::Request<super::DeleteContainerRequest>,
-        ) -> Result<tonic::Response<super::DeleteContainerResponse>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct PodmanServer<T: Podman> {
@@ -396,46 +361,6 @@ pub mod podman_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = StopContainerSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/podman.Podman/DeleteContainer" => {
-                    #[allow(non_camel_case_types)]
-                    struct DeleteContainerSvc<T: Podman>(pub Arc<T>);
-                    impl<
-                        T: Podman,
-                    > tonic::server::UnaryService<super::DeleteContainerRequest>
-                    for DeleteContainerSvc<T> {
-                        type Response = super::DeleteContainerResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::DeleteContainerRequest>,
-                        ) -> Self::Future {
-                            let inner = self.0.clone();
-                            let fut = async move {
-                                (*inner).delete_container(request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = DeleteContainerSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
