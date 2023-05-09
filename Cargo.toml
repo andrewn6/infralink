@@ -2,6 +2,7 @@
 members = [
   "principal", # Codebase for principal / master nodes
   "worker",    # Codebase for worker nodes
+  
 ]
 
 [profile.release]
