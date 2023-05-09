@@ -232,24 +232,31 @@ pub async fn main() {
 
 	let channel = conn.create_channel().await.unwrap();
 	let num_workers = AtomicUsize::new(0);
+
 	let (tx, rx) = mpsc::channel::<Metrics>(); 
 	let tx = std::sync::Arc::new(std::sync::Mutex::new(tx)); 
+
 	let notify = Arc::new(Notify::new());
+	let metrics_rx = Arc::new(Mutex::new(rx));
+	let mut worker_states: Vec<WorkerState> = Vec::new();
 	
 	let queue = channel	
 		.queue_declare("worker", QueueDeclareOptions::default(), FieldTable::default())
 		.await
 		.unwrap();
+
 	let worker_state = spawn_worker(channel, 0, rx, &tx, notify)
 		.await
 		.unwrap();
 
-		num_workers.fetch_add(1, OtherOrdering::SeqCst);
+	worker_states.push(worker_state);
+	num_workers.fetch_add(1, OtherOrdering::SeqCst);
+	
 	
 	let mut interval = time::interval(Duration::from_secs(5));
 
 	const MAX_WORKERS: usize = 10;
-	let num_workers = AtomicUsize::new(0);
+	const WORKLOAD_THRESHOLD: f64 = 50.0;
 
 	loop {
 		interval.tick().await;
@@ -259,7 +266,19 @@ pub async fn main() {
 			continue;
 		}
 	
-		let num_workers = AtomicUsize::new(0);
+		if num_workers_value > 1 {
+			match scale_down(
+				&num_workers,
+                &mut worker_states,
+                &conn,
+                &channel,
+                &metrics_rx,
+                WORKLOAD_THRESHOLD,
+			).await {
+				Ok(_) => continue,
+				Err(err) => error!("Failed to scale down: {}", err),
+			};
+		}
 	
 		tokio::spawn(async move {
 			let worker_state = scale_up(
