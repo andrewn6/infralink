@@ -1,16 +1,14 @@
 use bollard::Docker;
-use bollard::container::{Config, CreateContainerOptions, StartContainerOptions, RemoveContainerOptions};
-use reqwest::StatusCode;
+use bollard::container::{Config, CreateContainerOptions, RemoveContainerOptions};
 
 use std::collections::HashMap;
-use tokio::runtime::Runtime;
 use tonic::{Request, Response, Status};
 
 mod docker {
 	include!("../docker.rs");
 }
 
-use docker::{StartContainerRequest, StopContainerRequest, DeleteContainerRequest, Container, Pod, CreatePodResponse};
+use docker::{StartContainerRequest, StopContainerRequest, DeleteContainerRequest, Pod, CreatePodResponse};
 
 #[tonic::async_trait]
 pub trait DockerService {
@@ -87,21 +85,58 @@ impl DockerService for MyDockerService {
 		&self,
 		request: Request<StartContainerRequest>,
 	) -> Result<Response<()>, Status> {
-		unimplemented!()
+		let request = request.into_inner();
+
+		let docker = Docker::connect_with_local_defaults().unwrap();
+	
+		match docker.start_container::<String>(&request.container_id, None).await {
+			Ok(_) => Ok(Response::new(())),
+
+			Err(err) => {
+				eprintln!("Error starting container: {:?}", err);
+				Err(Status::internal("Failed to start container"))
+			}
+		}
+		
 	}
 
 	async fn stop_container(
 		&self,
 		request: Request<StopContainerRequest>,
 	) -> Result<Response<()>, Status> {
-		unimplemented!()
+		let request = request.into_inner();
+
+		let docker = Docker::connect_with_local_defaults().unwrap();
+
+		match docker.stop_container(&request.name, None).await {
+			Ok(_) => Ok(Response::new(())),
+			Err(err) => {
+				eprintln!("Error stopping container: {:?}", err);
+				Err(Status::internal("Failed to stop container"))
+			}
+		}
 	}
 
 	async fn delete_container(
 		&self,
 		request: Request<DeleteContainerRequest>,
 	) -> Result <Response<()>, Status> {
-		unimplemented!()
+		let request = request.into_inner();
+
+		let docker = Docker::connect_with_local_defaults().unwrap();
+
+		let options = Some(RemoveContainerOptions {
+			force: true,
+			v: true,
+			..Default::default()
+		});
+
+		match docker.remove_container(&request.container_id, options).await {
+			Ok(_) => Ok(Response::new(())),
+			Err(err) => {
+				eprintln!("Error deleting container: {:?}", err);
+				Err(Status::internal("Failed to delete container"))
+			}
+		}
 	}
-		
 }
