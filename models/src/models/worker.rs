@@ -21,5 +21,5 @@ pub struct Worker {
 	pub state: InstanceState,
 	pub volumes: Vec<String>,
 	pub last_updated: DateTime<Utc>,
-	pub last_health_check: HealthCheck,
+	pub last_health_check: Option<HealthCheck>,
 }
