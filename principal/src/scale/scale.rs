@@ -3,12 +3,11 @@ use std::sync::atomic::{AtomicUsize, Ordering as OtherOrdering};
 use std::sync::mpsc::{self};
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use lapin::types::FieldTable;
-use serde::{Deserialize, Serialize};
 
-use tokio::sync::Notify;
+use tokio::sync::{Mutex, Notify};
 use tokio::time::{self};
 use tracing::{error, info};
 use tracing_subscriber::fmt;
@@ -24,6 +23,17 @@ pub struct WorkerState {
 	pub id: usize,
 	pub channel: Channel,
 	pub notify: Arc<Notify>,
+	pub worker_id: usize,
+	pub workload: f64,
+}
+
+fn remove_worker(worker_states: &mut Vec<WorkerState>, worker_id: usize) -> Result<(), String> {
+	if let Some(index) = worker_states.iter().position(|w| w.id == worker_id) {
+		worker_states.remove(index);
+		Ok(())
+	} else {
+		Err(format!("Worker with id {} not found", worker_id))
+	}
 }
 
 fn worker(id: usize, rx: mpsc::Receiver<Metrics>, notify: Arc<Notify>) -> Metrics {
@@ -79,7 +89,74 @@ async fn spawn_worker(
 		id,
 		channel,
 		notify,
+		worker_id: todo!(),
+		workload: todo!(),
 	})
+}
+
+async fn scale_down(
+	num_workers: &AtomicUsize,
+	worker_states: &mut Vec<WorkerState>,
+	conn: &Connection,
+	channel: &Channel,
+	metrics_rx: &Arc<Mutex<mpsc::Receiver<Metrics>>>,
+	workload_threshold: f64,
+) -> Result<(), Box<dyn std::error::Error>> {
+	const MIN_WORKERS: usize = 1;
+	let num_workers_value = num_workers.load(OtherOrdering::SeqCst);
+
+	if num_workers_value > MIN_WORKERS {
+		let mut total_workload = 0.0;
+		let mut num_metrics = 0;
+
+		for _ in 0..num_workers_value {
+			if let Ok(metrics) = metrics_rx.lock().await.recv_timeout(Duration::from_secs(2)) {
+				// add .await
+				total_workload += metrics.workload;
+				num_metrics += 1;
+			}
+		}
+
+		if num_metrics == 0 {
+			info!("No metrics received, can't scale down");
+			return Ok(());
+		}
+
+		let average_workload = total_workload / num_metrics as f64;
+
+		if average_workload > workload_threshold {
+			let mut worker_to_remove = None;
+			let mut lowest_workload = f64::MAX;
+
+			for (i, worker_state) in worker_states.iter().enumerate() {
+				if worker_state.workload < lowest_workload {
+					worker_to_remove = Some(i);
+					lowest_workload = worker_state.workload;
+				}
+			}
+
+			if let Some(worker_to_remove) = worker_to_remove {
+				let worker_id = worker_states[worker_to_remove].id;
+				match remove_worker(worker_states, worker_id) {
+					Ok(()) => {
+						worker_states.remove(worker_to_remove);
+						num_workers.fetch_sub(1, OtherOrdering::SeqCst);
+						info!(
+							"Scaled down to {} workers",
+							num_workers.load(OtherOrdering::SeqCst)
+						);
+						Ok(())
+					}
+					Err(err) => {
+						error!("Failed to remove worker {}: {}", worker_id, err);
+						Err(err)
+					}
+				};
+			};
+		}
+	}
+
+	Ok(())
 }
 
 async fn scale_up(
@@ -134,6 +211,8 @@ async fn scale_up(
 		id,
 		channel: channel.clone(),
 		notify: notify.clone(),
+		worker_id: todo!(),
+		workload: todo!(),
 	})
 }
 
@@ -155,9 +234,13 @@ pub async fn main() {
 
 	let channel = conn.create_channel().await.unwrap();
 	let num_workers = AtomicUsize::new(0);
+
 	let (tx, rx) = mpsc::channel::<Metrics>();
 	let tx = std::sync::Arc::new(std::sync::Mutex::new(tx));
+
 	let notify = Arc::new(Notify::new());
+	let metrics_rx = Arc::new(Mutex::new(rx));
+	let mut worker_states: Vec<WorkerState> = Vec::new();
 
 	let queue = channel
 		.queue_declare(
@@ -167,14 +250,16 @@ pub async fn main() {
 		)
 		.await
 		.unwrap();
+
 	let worker_state = spawn_worker(channel, 0, rx, &tx, notify).await.unwrap();
 
+	worker_states.push(worker_state);
 	num_workers.fetch_add(1, OtherOrdering::SeqCst);
 
 	let mut interval = time::interval(Duration::from_secs(5));
 
 	const MAX_WORKERS: usize = 10;
-	let num_workers = AtomicUsize::new(0);
+	const WORKLOAD_THRESHOLD: f64 = 50.0;
 
 	loop {
 		interval.tick().await;
@@ -184,7 +269,21 @@ pub async fn main() {
 			continue;
 		}
 
-		let num_workers = AtomicUsize::new(0);
+		if num_workers_value > 1 {
+			match scale_down(
+				&num_workers,
+				&mut worker_states,
+				&conn,
+				&channel,
+				&metrics_rx,
+				WORKLOAD_THRESHOLD,
+			)
+			.await
+			{
+				Ok(_) => continue,
+				Err(err) => error!("Failed to scale down: {}", err),
+			};
+		}
 
 		tokio::spawn(async move {
 			let worker_state = scale_up(

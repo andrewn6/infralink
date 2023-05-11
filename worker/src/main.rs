@@ -25,10 +25,20 @@ use hello_world::greeter_server::{Greeter, GreeterServer};
 use hello_world::{HelloReply, HelloRequest};
 
 mod container {
+<<<<<<< HEAD
+    pub mod delete;
+    pub mod create;
+}
+
+use container::delete;
+
+use container::create;
+=======
 	pub mod create;
 }
 
 // use container::create::ContainerCreateService;
+>>>>>>> c819a0ea3cbdd9772220e50c98036f468d1974f5
 
 mod hello_world {
 	include!("helloworld.rs");

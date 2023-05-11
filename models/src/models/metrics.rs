@@ -7,5 +7,6 @@ pub struct Metrics {
 	pub memory: f64,
 	pub disk: f64,
 	pub network: f64,
+	pub workload: f64,
 	pub time: DateTime<Utc>,
 }
