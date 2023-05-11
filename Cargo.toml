@@ -1,7 +1,9 @@
 [workspace]
 members = [
-  "principal", # Codebase for principal / master nodes
-  "worker",    # Codebase for worker nodes
+  "principal",    # Codebase for principal / master nodes
+  "worker",       # Codebase for worker nodes
+  "health-check", # Codebase for health check
+  "models",
 ]
 
 [profile.release]

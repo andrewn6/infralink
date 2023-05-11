@@ -21,6 +21,8 @@ pub struct HealthCheck {
 	pub max_failures: u64,
 	// Type of health check.
 	pub r#type: HealthCheckType,
+	// Headers to include in the health check request.
+	pub headers: Option<Vec<Header>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -38,4 +40,10 @@ pub enum HealthCheckType {
 	HTTPS,
 	HTTP,
 	TCP,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Header {
+	pub key: String,
+	pub value: String,
 }
