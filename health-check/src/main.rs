@@ -13,16 +13,15 @@ use models::models::worker::Worker;
 pub mod db;
 pub mod health_check;
 
-use health_check::create_health_check;
+use health_check::schedule_health_checks;
 
 #[tokio::main]
 pub async fn main() {
 	dotenv().unwrap();
 
-	let mut connection = db::connection().unwrap();
-	// tracing::info!("Successfully established Redis connection");
+	let mut connection = db::connection().await.unwrap();
 
-	create_health_check(
+	schedule_health_checks(
 		&mut connection,
 		Worker {
 			id: 123.to_string(),
@@ -49,13 +48,14 @@ pub async fn main() {
 				disk: 100.0,
 				network: 100.0,
 				time: Utc::now(),
+				workload: 10.0,
 			},
 			state: InstanceState::Running,
 			volumes: vec![],
 			last_updated: Utc::now(),
 			last_health_check: None,
 		},
-		HealthCheck {
+		vec![HealthCheck {
 			path: "/health".to_string(),
 			port: 80,
 			method: Some(HttpMethod::GET),
@@ -69,7 +69,8 @@ pub async fn main() {
 				key: "Host".to_string(),
 				value: "edge.dimension.dev".to_string(),
 			}]),
-		},
+		}],
 	)
-	.await;
+	.await
+	.unwrap();
 }
