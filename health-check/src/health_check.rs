@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use dotenv_codegen::dotenv;
 use models::models::health_check::HealthCheck;
 use models::models::worker::Worker;
 use redis::cluster_async::ClusterConnection;
@@ -19,6 +20,7 @@ pub async fn schedule_health_checks(
 		let mut connection_clone = connection.clone();
 		let worker_clone = worker.clone();
 		let config_clone = config.clone();
+		let region = dotenv!("REGION");
 
 		let handle = tokio::spawn(async move {
 			loop {
@@ -30,6 +32,7 @@ pub async fn schedule_health_checks(
 							&mut connection_clone,
 							&worker_clone,
 							&config_clone,
+							region,
 						)
 						.await
 						{
@@ -55,6 +58,7 @@ async fn run_http_health_check(
 	connection: &mut ClusterConnection,
 	worker: &Worker,
 	config: &HealthCheck,
+	region: &str,
 ) -> Result<(), Error> {
 	let url = format!(
 		"http://{}:{}/{}",
@@ -76,7 +80,7 @@ async fn run_http_health_check(
 	if response.status().is_success() {
 		// Mark the instance as available on our database.
 		let _: () = connection
-			.set(format!("worker:{}:available", worker.id), false)
+			.set(format!("worker:{}:{}:available", worker.id, region), false)
 			.await
 			.unwrap();
 	} else {
