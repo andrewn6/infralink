@@ -64,15 +64,15 @@ pub struct DeleteContainerResponse {
     pub message: ::prost::alloc::string::String,
 }
 /// Generated client implementations.
-pub mod podman_client {
+pub mod docker_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
     #[derive(Debug, Clone)]
-    pub struct PodmanClient<T> {
+    pub struct DockerClient<T> {
         inner: tonic::client::Grpc<T>,
     }
-    impl PodmanClient<tonic::transport::Channel> {
+    impl DockerClient<tonic::transport::Channel> {
         /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
@@ -83,7 +83,7 @@ pub mod podman_client {
             Ok(Self::new(conn))
         }
     }
-    impl<T> PodmanClient<T>
+    impl<T> DockerClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
@@ -101,7 +101,7 @@ pub mod podman_client {
         pub fn with_interceptor<F>(
             inner: T,
             interceptor: F,
-        ) -> PodmanClient<InterceptedService<T, F>>
+        ) -> DockerClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
@@ -115,7 +115,7 @@ pub mod podman_client {
                 http::Request<tonic::body::BoxBody>,
             >>::Error: Into<StdError> + Send + Sync,
         {
-            PodmanClient::new(InterceptedService::new(inner, interceptor))
+            DockerClient::new(InterceptedService::new(inner, interceptor))
         }
         /// Compress requests with the given encoding.
         ///
@@ -146,7 +146,7 @@ pub mod podman_client {
                     )
                 })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/podman.Podman/CreatePod");
+            let path = http::uri::PathAndQuery::from_static("/docker.Docker/CreatePod");
             self.inner.unary(request.into_request(), path, codec).await
         }
         pub async fn start_container(
@@ -164,7 +164,7 @@ pub mod podman_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/podman.Podman/StartContainer",
+                "/docker.Docker/StartContainer",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -183,7 +183,7 @@ pub mod podman_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/podman.Podman/StopContainer",
+                "/docker.Docker/StopContainer",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -202,19 +202,19 @@ pub mod podman_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/podman.Podman/DeleteContainer",
+                "/docker.Docker/DeleteContainer",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }
 /// Generated server implementations.
-pub mod podman_server {
+pub mod docker_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with PodmanServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with DockerServer.
     #[async_trait]
-    pub trait Podman: Send + Sync + 'static {
+    pub trait Docker: Send + Sync + 'static {
         async fn create_pod(
             &self,
             request: tonic::Request<super::Pod>,
@@ -233,13 +233,13 @@ pub mod podman_server {
         ) -> Result<tonic::Response<super::DeleteContainerResponse>, tonic::Status>;
     }
     #[derive(Debug)]
-    pub struct PodmanServer<T: Podman> {
+    pub struct DockerServer<T: Docker> {
         inner: _Inner<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
     }
     struct _Inner<T>(Arc<T>);
-    impl<T: Podman> PodmanServer<T> {
+    impl<T: Docker> DockerServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -273,9 +273,9 @@ pub mod podman_server {
             self
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for PodmanServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for DockerServer<T>
     where
-        T: Podman,
+        T: Docker,
         B: Body + Send + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
@@ -291,10 +291,10 @@ pub mod podman_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/podman.Podman/CreatePod" => {
+                "/docker.Docker/CreatePod" => {
                     #[allow(non_camel_case_types)]
-                    struct CreatePodSvc<T: Podman>(pub Arc<T>);
-                    impl<T: Podman> tonic::server::UnaryService<super::Pod>
+                    struct CreatePodSvc<T: Docker>(pub Arc<T>);
+                    impl<T: Docker> tonic::server::UnaryService<super::Pod>
                     for CreatePodSvc<T> {
                         type Response = super::CreatePodResponse;
                         type Future = BoxFuture<
@@ -327,11 +327,11 @@ pub mod podman_server {
                     };
                     Box::pin(fut)
                 }
-                "/podman.Podman/StartContainer" => {
+                "/docker.Docker/StartContainer" => {
                     #[allow(non_camel_case_types)]
-                    struct StartContainerSvc<T: Podman>(pub Arc<T>);
+                    struct StartContainerSvc<T: Docker>(pub Arc<T>);
                     impl<
-                        T: Podman,
+                        T: Docker,
                     > tonic::server::UnaryService<super::StartContainerRequest>
                     for StartContainerSvc<T> {
                         type Response = super::StartContainerResponse;
@@ -367,11 +367,11 @@ pub mod podman_server {
                     };
                     Box::pin(fut)
                 }
-                "/podman.Podman/StopContainer" => {
+                "/docker.Docker/StopContainer" => {
                     #[allow(non_camel_case_types)]
-                    struct StopContainerSvc<T: Podman>(pub Arc<T>);
+                    struct StopContainerSvc<T: Docker>(pub Arc<T>);
                     impl<
-                        T: Podman,
+                        T: Docker,
                     > tonic::server::UnaryService<super::StopContainerRequest>
                     for StopContainerSvc<T> {
                         type Response = super::StopContainerResponse;
@@ -407,11 +407,11 @@ pub mod podman_server {
                     };
                     Box::pin(fut)
                 }
-                "/podman.Podman/DeleteContainer" => {
+                "/docker.Docker/DeleteContainer" => {
                     #[allow(non_camel_case_types)]
-                    struct DeleteContainerSvc<T: Podman>(pub Arc<T>);
+                    struct DeleteContainerSvc<T: Docker>(pub Arc<T>);
                     impl<
-                        T: Podman,
+                        T: Docker,
                     > tonic::server::UnaryService<super::DeleteContainerRequest>
                     for DeleteContainerSvc<T> {
                         type Response = super::DeleteContainerResponse;
@@ -462,7 +462,7 @@ pub mod podman_server {
             }
         }
     }
-    impl<T: Podman> Clone for PodmanServer<T> {
+    impl<T: Docker> Clone for DockerServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -472,7 +472,7 @@ pub mod podman_server {
             }
         }
     }
-    impl<T: Podman> Clone for _Inner<T> {
+    impl<T: Docker> Clone for _Inner<T> {
         fn clone(&self) -> Self {
             Self(self.0.clone())
         }
@@ -482,7 +482,7 @@ pub mod podman_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: Podman> tonic::server::NamedService for PodmanServer<T> {
-        const NAME: &'static str = "podman.Podman";
+    impl<T: Docker> tonic::server::NamedService for DockerServer<T> {
+        const NAME: &'static str = "docker.Docker";
     }
 }
