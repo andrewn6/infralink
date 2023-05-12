@@ -25,6 +25,7 @@ pub async fn schedule_health_checks(
 		let handle = tokio::spawn(async move {
 			loop {
 				sleep(Duration::from_millis(config_clone.interval)).await;
+
 				match config_clone.r#type {
 					models::models::health_check::HealthCheckType::HTTPS => {}
 					models::models::health_check::HealthCheckType::HTTP => {
@@ -80,7 +81,7 @@ async fn run_http_health_check(
 	if response.status().is_success() {
 		// Mark the instance as available on our database.
 		let _: () = connection
-			.set(format!("worker:{}:{}:available", worker.id, region), false)
+			.set(format!("worker:{}:{}:available", worker.id, region), true)
 			.await
 			.unwrap();
 	} else {
@@ -90,6 +91,14 @@ async fn run_http_health_check(
 			.await
 			.unwrap();
 	}
+
+	let _: () = connection
+		.set(
+			format!("worker:{}:{}:last_health_check", worker.id, region),
+			chrono::Utc::now().to_rfc3339(),
+		)
+		.await
+		.unwrap();
 
 	Ok(())
 }
