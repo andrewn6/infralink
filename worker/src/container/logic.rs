@@ -58,7 +58,7 @@ impl DockerService for MyDockerService {
 				.iter()
 				.map(|(k, v)| format!("{}={}", k, v))
 				.collect::<Vec<_>>()),
-			cmd: Some(request.containers[0].commands),
+			cmd: Some(request.containers[0].commands.clone()),
 			exposed_ports: Some(exposed_ports),
 			..Default::default()
 		};
