@@ -10,6 +10,13 @@ message Container {
   map<string, string> env = 5;
 }
 
+service DockerService { // change this
+  rpc CreatePod (Pod) returns (CreatePodResponse);
+  rpc StartContainer (StartContainerRequest) returns (StartContainerResponse);
+  rpc StopContainer (StopContainerRequest) returns (StopContainerResponse);
+  rpc DeleteContainer (DeleteContainerRequest) returns(DeleteContainerResponse);
+}
+
 message Pod {
   repeated Container containers = 1;
 }
@@ -40,11 +47,4 @@ message DeleteContainerRequest {
 
 message DeleteContainerResponse {
   string message = 1;
-}
-
-service Docker {
-  rpc CreatePod (Pod) returns (CreatePodResponse);
-  rpc StartContainer (StartContainerRequest) returns (StartContainerResponse);
-  rpc StopContainer (StopContainerRequest) returns (StopContainerResponse);
-  rpc DeleteContainer (DeleteContainerRequest) returns(DeleteContainerResponse);
 }
