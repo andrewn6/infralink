@@ -12,7 +12,7 @@ use super::region::Region;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Worker {
-	pub id: String,
+	pub id: u64,
 	pub network: Network,
 	pub provider: CloudProvider,
 	pub region: Region,

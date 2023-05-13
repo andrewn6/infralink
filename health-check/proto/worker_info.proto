@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package worker_info;
+
+message WorkerInfo {
+  uint64 id = 1;
+  Network network = 2;
+}
+
+message Network {
+  string primary_ipv4 = 1;
+  optional string primary_ipv6 = 2;
+}
