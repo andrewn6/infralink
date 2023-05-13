@@ -2,7 +2,7 @@ use dotenv_codegen::dotenv;
 use models::models::health_check::{HealthCheck, HealthCheckType, HttpMethod};
 use models::models::network::Network;
 use redis::cluster_async::ClusterConnection;
-use redis::AsyncCommands;
+use redis::{AsyncCommands, RedisResult};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::{Client, Error};
 use serde::{Deserialize, Serialize};
@@ -44,14 +44,14 @@ pub async fn schedule_health_checks(
 		let worker_clone = worker.clone();
 		let config_clone = config.clone();
 		let region = dotenv!("REGION");
-
 		let uuid = Uuid::new_v4();
+
 		let key = format!(
 			"pj:{}:wkr:{}:{}:{}",
 			project_id, worker_clone.id, region, uuid
 		);
 
-		let key_clone = key.clone(); // clone the key here
+		let key_clone = key.clone();
 
 		let handle = tokio::spawn(async move {
 			// Wait for the grace period before starting the health checks.
@@ -61,14 +61,14 @@ pub async fn schedule_health_checks(
 
 			loop {
 				// Run the health check and increment the failure count if it fails.
-				if let Err(e) = run_http_health_check(
-					&mut connection_clone,
+				if let Err(e) = run_http_health_check(&mut HealthCheckContext {
+					connection: &mut connection_clone,
+					key: key.clone(),
 					project_id,
-					&worker_clone,
-					&config_clone,
-					&uuid.to_string(),
+					worker: &worker_clone,
+					config: &config_clone,
 					region,
-				)
+				})
 				.await
 				{
 					tracing::error!("Error: {:?}", e);
@@ -80,7 +80,7 @@ pub async fn schedule_health_checks(
 				// Mark the worker as unavailable if the failure count exceeds the maximum.
 				if failure_count > config_clone.max_failures {
 					let _: () = connection_clone
-						.hset(&key_clone, "available", false)
+						.hset(&key.clone(), "available", false)
 						.await
 						.unwrap();
 				}
@@ -91,50 +91,36 @@ pub async fn schedule_health_checks(
 		});
 
 		tasks_map.lock().unwrap().insert(
-			key.clone(),
+			key_clone.clone(),
 			HealthCheckTask {
 				handle,
-				health_check_id: key.clone(),
+				health_check_id: key_clone.clone(),
 			},
 		);
 
-		tasks.push(key);
+		tasks.push(key_clone);
 	}
 
 	tasks
 }
 
-/// This function performs an HTTP health check based on the provided HealthCheckConfig.
-/// It sends an HTTP request to the specified worker and updates its status in the database based on the response.
-async fn run_http_health_check(
-	connection: &mut ClusterConnection,
-	project_id: u64,
-	worker: &WorkerInfo,
-	config: &HealthCheck,
-	uuid: &str,
-	region: &str,
-) -> Result<(), Error> {
-	// Construct the URL based on the provided configuration.
-	let url = format!(
+/// This helper function constructs the URL for a health check.
+fn construct_url(worker: &WorkerInfo, config: &HealthCheck) -> String {
+	format!(
 		"http{}://{}:{}/{}",
-		worker.network.primary_ipv4,
-		// to check if the health check requires https, we can match on the type
 		if config.r#type == HealthCheckType::HTTPS {
 			"s"
 		} else {
 			""
 		},
+		worker.network.primary_ipv4,
 		config.port,
 		config.path.strip_prefix("/").unwrap_or(&config.path)
-	);
+	)
+}
 
-	// Create an HTTP client with the specified timeout.
-	let client = Client::builder()
-		.timeout(Duration::from_millis(config.timeout))
-		.danger_accept_invalid_certs(config.tls_skip_verification.unwrap_or(false))
-		.build()?;
-
-	// Construct the headers based on the provided configuration.
+/// This helper function constructs the headers for a health check.
+fn construct_headers(config: &HealthCheck) -> HeaderMap {
 	let mut headers = HeaderMap::new();
 	if let Some(header_vec) = &config.headers {
 		for header in header_vec {
@@ -145,25 +131,50 @@ async fn run_http_health_check(
 		}
 	}
 
-	// Send the HTTP request and await the response.
-	let response = match config.method {
+	headers
+}
+
+pub struct HealthCheckContext<'a> {
+	pub connection: &'a mut ClusterConnection,
+	pub key: String,
+	pub project_id: u64,
+	pub worker: &'a WorkerInfo,
+	pub config: &'a HealthCheck,
+	pub region: &'a str,
+}
+
+async fn run_http_health_check(context: &mut HealthCheckContext<'_>) -> Result<(), Error> {
+	let url = construct_url(&context.worker, &context.config);
+	let headers = construct_headers(&context.config);
+
+	let client = Client::builder()
+		.timeout(Duration::from_millis(context.config.timeout))
+		.danger_accept_invalid_certs(context.config.tls_skip_verification.unwrap_or(false))
+		.build()
+		.unwrap();
+
+	let response = match context.config.method {
 		Some(HttpMethod::GET) => client.get(&url).headers(headers).send().await?,
 		Some(HttpMethod::POST) => client.post(&url).headers(headers).send().await?,
-		// Add more HTTP methods as needed.
+		Some(HttpMethod::PUT) => client.put(&url).headers(headers).send().await?,
+		Some(HttpMethod::DELETE) => client.delete(&url).headers(headers).send().await?,
+		Some(HttpMethod::PATCH) => client.patch(&url).headers(headers).send().await?,
 		_ => client.get(&url).headers(headers).send().await?,
 	};
 
-	// Update the status of the worker in the database based on the response.
-	let key = format!("pj:{}:wkr:{}:{}:{}", project_id, worker.id, region, uuid);
-
-	let _: () = connection
-		.hset(&key, "available", response.status().is_success())
+	context
+		.connection
+		.hset::<_, _, _, usize>(&context.key, "available", response.status().is_success())
 		.await
 		.unwrap();
 
-	// Record the time of the last health check.
-	let _: () = connection
-		.hset(&key, "last_health_check", chrono::Utc::now().to_rfc3339())
+	context
+		.connection
+		.hset::<_, _, _, usize>(
+			&context.key,
+			"last_health_check",
+			chrono::Utc::now().to_rfc3339(),
+		)
 		.await
 		.unwrap();
 
@@ -174,8 +185,7 @@ pub fn stop_health_check(
 	tasks_map: Arc<Mutex<HashMap<String, HealthCheckTask>>>,
 	health_check_id: String,
 ) {
-	let mut map = tasks_map.lock().unwrap();
-	if let Some(task) = map.remove(&health_check_id) {
+	if let Some(task) = tasks_map.lock().unwrap().remove(&health_check_id) {
 		task.handle.abort(); // This will stop the health check.
 	} else {
 		println!("No health check found with ID {}", health_check_id);
