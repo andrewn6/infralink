@@ -1,1 +1,1 @@
-pub mod logicl
+pub mod logic;

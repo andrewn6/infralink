@@ -3,7 +3,7 @@ members = [
   "principal",    # Codebase for principal / master nodes
   "worker",       # Codebase for worker nodes
   "health-check", # Codebase for health check
-  "models",
+  "models", # Models used for network, cloud providers, metrics etc.
 ]
 
 [profile.release]
