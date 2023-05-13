@@ -35,7 +35,7 @@ pub enum HttpMethod {
 	OPTIONS,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum HealthCheckType {
 	HTTPS,
 	HTTP,

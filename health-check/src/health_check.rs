@@ -1,5 +1,5 @@
 use dotenv_codegen::dotenv;
-use models::models::health_check::{HealthCheck, HttpMethod};
+use models::models::health_check::{HealthCheck, HealthCheckType, HttpMethod};
 use models::models::network::Network;
 use redis::cluster_async::ClusterConnection;
 use redis::AsyncCommands;
@@ -116,8 +116,14 @@ async fn run_http_health_check(
 ) -> Result<(), Error> {
 	// Construct the URL based on the provided configuration.
 	let url = format!(
-		"http://{}:{}/{}",
+		"http{}://{}:{}/{}",
 		worker.network.primary_ipv4,
+		// to check if the health check requires https, we can match on the type
+		if config.r#type == HealthCheckType::HTTPS {
+			"s"
+		} else {
+			""
+		},
 		config.port,
 		config.path.strip_prefix("/").unwrap_or(&config.path)
 	);
