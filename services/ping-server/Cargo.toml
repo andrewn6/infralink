@@ -1,0 +1,18 @@
+[package]
+name = "ping-server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web = "4.3.1"
+redis = { version = "0.23.0", features = [
+  "tokio-comp",
+  "r2d2",
+  "cluster-async",
+] }
+dotenv = "0.15.0"
+dotenv_codegen = "0.15.0"
+tokio = { version = "1.28.1", features = ["rt-multi-thread", "macros"] }
+ping-rs = "0.1.2"

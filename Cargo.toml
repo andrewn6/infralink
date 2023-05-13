@@ -1,9 +1,11 @@
 [workspace]
 members = [
-  "principal",    # Codebase for principal / master nodes
-  "worker",       # Codebase for worker nodes
-  "health-check", # Codebase for health check
-  "models", # Models used for network, cloud providers, metrics etc.
+  "principal",              # Codebase for principal / master nodes
+  "worker",                 # Codebase for worker nodes
+  "models",                 # Models used for network, cloud providers, metrics etc.
+  "services/health-check",  # Codebase for health check
+  "services/load-balancer", # Load balancer
+  "services/ping-server",   # Ping server
 ]
 
 [profile.release]

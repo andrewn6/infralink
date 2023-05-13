@@ -178,6 +178,8 @@ async fn run_http_health_check(context: &mut HealthCheckContext<'_>) -> Result<(
 		.await
 		.unwrap();
 
+	// todo: include latency in the health check
+
 	Ok(())
 }
 
