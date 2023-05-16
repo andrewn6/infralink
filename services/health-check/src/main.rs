@@ -13,8 +13,14 @@ mod worker_info {
 use worker_info::health_check_service_server::HealthCheckService;
 use worker_info::{WorkerInfo, ScheduleHealthCheckResponse};
 
+use worker_info::health_check_service_server;
+
 #[derive(Default, Clone)]
 pub struct HealthCheckServer;
+
+impl tonic::server::NamedService for HealthCheckServer {
+	const NAME: &'static str = "health_check.HealthCheck";
+}
 
 #[tonic::async_trait]
 impl HealthCheckService for HealthCheckServer {
@@ -72,11 +78,11 @@ pub async fn main() {
 	*/
 
 	let addr = "0.0.0.0:50052".parse().unwrap();
-	let health_check_server = HealthCheckServer::default();
+	let health_check_server = health_check_service_server::HealthCheckServiceServer::new(HealthCheckServer);
 
 	println!("Health Check Server listening on {}", addr);
 	Server::builder()
-		.add_service(health_check_server.clone())
+		.add_service(health_check_server)
 		.serve(addr)
 		.await
 		.unwrap();
