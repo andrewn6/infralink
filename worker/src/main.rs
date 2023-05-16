@@ -42,8 +42,8 @@ mod proto_network {
 	include!("network.rs");
 }
 
-#[derive(Default)]
-pub struct MyDockerService {}
+//#[derive(Default)]
+//pub struct MyDockerService {}
 
 #[derive(Default)]
 pub struct ComputeServiceImpl {}
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	Server::builder()
 		.add_service(GreeterServer::new(greeter))
-		.add_service(DockerServiceServer::new(docker_service))
+		//.add_service(DockerServiceServer::new(docker_service))
 		.add_service(reflection_service)
 		.serve(addr)
 		.await?;
