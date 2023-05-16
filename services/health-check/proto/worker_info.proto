@@ -11,3 +11,11 @@ message Network {
   string primary_ipv4 = 1;
   optional string primary_ipv6 = 2;
 }
+
+message ScheduleHealthCheckResponse {
+  string message = 1;
+}
+
+service HealthCheckService {
+  rpc ScheduleHealthChecks (WorkerInfo) returns (ScheduleHealthCheckResponse);
+}

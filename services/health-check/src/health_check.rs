@@ -114,7 +114,7 @@ fn construct_url(worker: &WorkerInfo, config: &HealthCheck) -> String {
 		},
 		worker.network.primary_ipv4,
 		config.port,
-		config.path.strip_prefix("/").unwrap_or(&config.path)
+		config.path.strip_prefix('/').unwrap_or(&config.path)
 	)
 }
 
@@ -143,8 +143,8 @@ pub struct HealthCheckContext<'a> {
 }
 
 async fn run_http_health_check(context: &mut HealthCheckContext<'_>) -> Result<(), Error> {
-	let url = construct_url(&context.worker, &context.config);
-	let headers = construct_headers(&context.config);
+	let url = construct_url(context.worker, context.config);
+	let headers = construct_headers(context.config);
 
 	let client = Client::builder()
 		.timeout(Duration::from_millis(context.config.timeout))

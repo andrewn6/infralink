@@ -9,16 +9,18 @@ workspace = ".."
 [dependencies]
 dotenv = "0.15.0"
 serde = { version = "1.0.160", features = ["derive"] }
-reqwest = { version = "0.11.16", features = ["rustls-tls", "json"] }
+reqwest = { version = "0.11.16", features = ["rustls-tls", "json", "blocking"] }
 dotenv_codegen = "0.15.0"
 serde_json = "1.0.93"
 tokio = "1.28.0"
 tonic = "0.9.2"
 lapin = "2.1.1"
 tracing = "0.1.37"
+tokio-stream = "0.1.14"
 tracing-subscriber = "0.3.17"
 chrono = "0.4.24"
 rand = "0.8.5"
+futures-util = "0.3.28"
 redis = { version = "0.23.0", features = [
   "tokio-comp",
   "r2d2",
