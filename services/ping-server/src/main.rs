@@ -1,47 +1,87 @@
-use ping_rs::send_ping_async;
+use colored::Colorize;
+use dotenv_codegen::dotenv;
+use std::convert::TryInto;
 use std::net::IpAddr;
+use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
+use surge_ping::ping;
+use tokio::sync::Mutex;
+use tokio::time::{self, Duration};
 
 pub mod db;
 
-use ping_rs::PingError;
-use std::fmt;
+async fn calculate_round_trip(destination_ip: IpAddr) -> u64 {
+	let payload = [0; 8];
 
-#[derive(Debug)]
-pub struct Error(PingError);
-
-impl fmt::Display for Error {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "Ping error: {:?}", self.0) }
-}
-
-impl std::error::Error for Error {}
-
-impl From<PingError> for Error {
-	fn from(error: PingError) -> Self { Error(error) }
-}
-
-async fn calculate_round_trip(destination_ip: IpAddr) -> Result<u32, Error> {
-	let data = [1, 2, 3, 4]; // ping data
-	let data_arc = Arc::new(&data[..]);
-	let timeout = Duration::from_secs(20);
-
-	// Run this 5 times and take the average
 	let mut total_rtt = 0;
 
 	for _ in 0..5 {
-		let result = send_ping_async(&destination_ip, timeout, data_arc.clone(), None).await?;
-		total_rtt += result.rtt;
+		let (_packet, duration) = ping(destination_ip, &payload).await.unwrap();
+		total_rtt += duration.as_millis();
 	}
 
-	Ok(total_rtt / 5)
+	(total_rtt / 5).try_into().unwrap()
 }
 
 #[tokio::main]
 async fn main() {
-	let destination_ip: IpAddr = "8.8.8.8".parse().unwrap();
-	match calculate_round_trip(destination_ip).await {
-		Ok(avg_rtt) => println!("Average round trip time: {} ms", avg_rtt),
-		Err(e) => println!("Error: {}", e),
-	}
+	let origin_region = dotenv!("REGION");
+
+	let mut connection = db::connection().await.unwrap();
+
+	db::set_airport_ip(&mut connection, "ord", "108.61.202.18")
+		.await
+		.unwrap();
+
+	let ping_map = db::get_airport_ips(&mut connection).await.unwrap();
+
+	let ping_map = Arc::new(Mutex::new(ping_map));
+
+	let ping_map_clone = Arc::clone(&ping_map);
+
+	let update_task = tokio::spawn(async move {
+		db::subscribe_to_changes(&mut *ping_map_clone.lock().await)
+			.await
+			.unwrap();
+	});
+
+	println!("Starting ping server...");
+
+	let ping_task = tokio::spawn(async move {
+		loop {
+			{
+				let ping_map_guard = ping_map.lock().await;
+				println!("Ping map: {:#?}", *ping_map_guard);
+			}
+
+			{
+				let ping_map_guard = ping_map.lock().await;
+				for (destination_region, ip) in ping_map_guard.iter() {
+					let destination_ip = IpAddr::from_str(ip).unwrap();
+
+					// Calculate the round trip time
+					let rtt = calculate_round_trip(destination_ip).await;
+
+					// Store the round trip time in Redis
+					db::store_ping(origin_region, destination_region, rtt)
+						.await
+						.unwrap();
+
+					println!(
+						"[{}] updated ping times from {} {} {} [{} milliseconds]",
+						chrono::Local::now().to_rfc3339().bright_black(),
+						origin_region.bright_cyan(),
+						"->".bright_magenta(),
+						destination_region.bright_green(),
+						rtt.to_string().bright_black()
+					);
+				}
+			}
+
+			println!("Sleeping for 5 seconds...");
+			time::sleep(Duration::from_millis(5000)).await;
+		}
+	});
+
+	let _ = tokio::try_join!(update_task, ping_task);
 }

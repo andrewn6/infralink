@@ -1,14 +1,15 @@
 use dotenv_codegen::dotenv;
 use models::models::health_check::{HealthCheck, HealthCheckType, HttpMethod};
 use models::models::network::Network;
-use redis::cluster_async::ClusterConnection;
-use redis::{AsyncCommands, RedisResult};
+use redis::aio::Connection;
+use redis::AsyncCommands;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::{Client, Error};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 use uuid::Uuid;
 
@@ -31,16 +32,16 @@ pub struct WorkerInfo {
 
 // This function creates a health check loop for a given HealthCheckConfig.
 pub async fn schedule_health_checks(
-	connection: &mut ClusterConnection,
+	connection: Arc<Mutex<Connection>>,
 	project_id: u64,
 	worker: WorkerInfo,
 	configs: Vec<HealthCheck>,
-	tasks_map: Arc<Mutex<HashMap<String, HealthCheckTask>>>, // added this
+	tasks_map: Arc<Mutex<HashMap<String, HealthCheckTask>>>,
 ) -> Vec<String> {
 	let mut tasks = vec![];
 
 	for config in configs {
-		let mut connection_clone = connection.clone();
+		let connection = Arc::clone(&connection);
 		let worker_clone = worker.clone();
 		let config_clone = config.clone();
 		let region = dotenv!("REGION");
@@ -61,8 +62,9 @@ pub async fn schedule_health_checks(
 
 			loop {
 				// Run the health check and increment the failure count if it fails.
+				let mut conn = connection.lock().await;
 				if let Err(e) = run_http_health_check(&mut HealthCheckContext {
-					connection: &mut connection_clone,
+					connection: &mut *conn,
 					key: key.clone(),
 					project_id,
 					worker: &worker_clone,
@@ -79,10 +81,7 @@ pub async fn schedule_health_checks(
 
 				// Mark the worker as unavailable if the failure count exceeds the maximum.
 				if failure_count > config_clone.max_failures {
-					let _: () = connection_clone
-						.hset(&key.clone(), "available", false)
-						.await
-						.unwrap();
+					let _: () = conn.hset(&key.clone(), "available", false).await.unwrap();
 				}
 
 				// Wait for the interval before running the next health check.
@@ -90,7 +89,7 @@ pub async fn schedule_health_checks(
 			}
 		});
 
-		tasks_map.lock().unwrap().insert(
+		tasks_map.lock().await.insert(
 			key_clone.clone(),
 			HealthCheckTask {
 				handle,
@@ -135,7 +134,7 @@ fn construct_headers(config: &HealthCheck) -> HeaderMap {
 }
 
 pub struct HealthCheckContext<'a> {
-	pub connection: &'a mut ClusterConnection,
+	pub connection: &'a mut Connection,
 	pub key: String,
 	pub project_id: u64,
 	pub worker: &'a WorkerInfo,
@@ -183,11 +182,11 @@ async fn run_http_health_check(context: &mut HealthCheckContext<'_>) -> Result<(
 	Ok(())
 }
 
-pub fn stop_health_check(
+pub async fn stop_health_check(
 	tasks_map: Arc<Mutex<HashMap<String, HealthCheckTask>>>,
 	health_check_id: String,
 ) {
-	if let Some(task) = tasks_map.lock().unwrap().remove(&health_check_id) {
+	if let Some(task) = tasks_map.lock().await.remove(&health_check_id) {
 		task.handle.abort(); // This will stop the health check.
 	} else {
 		println!("No health check found with ID {}", health_check_id);

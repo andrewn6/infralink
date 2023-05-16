@@ -1,12 +1,9 @@
 use dotenv_codegen::dotenv;
-use redis::cluster::ClusterClient;
-use redis::cluster_async::ClusterConnection;
+use redis::aio::Connection;
 use redis::RedisResult;
 
-pub async fn connection() -> RedisResult<ClusterConnection> {
-	let nodes = vec![dotenv!("REDIS_CONNECTION_URL")];
-
-	let client = ClusterClient::new(nodes).unwrap();
+pub async fn connection() -> RedisResult<Connection> {
+	let client = redis::Client::open(dotenv!("MASTER_REDIS_CONNECTION_URL"))?;
 
 	let connection = client.get_async_connection().await?;
 

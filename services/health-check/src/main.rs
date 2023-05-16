@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex; // Import tokio's Mutex instead of std's
 
 use dotenv::dotenv;
 use models::models::health_check::{Header, HealthCheck, HealthCheckType, HttpMethod};
@@ -14,13 +15,13 @@ use health_check::{schedule_health_checks, HealthCheckTask, WorkerInfo};
 pub async fn main() {
 	dotenv().unwrap();
 
-	let mut connection = db::connection().await.unwrap();
+	let connection = Arc::new(Mutex::new(db::connection().await.unwrap()));
 
 	let tasks_map: Arc<Mutex<HashMap<String, HealthCheckTask>>> =
 		Arc::new(Mutex::new(HashMap::new()));
 
 	schedule_health_checks(
-		&mut connection,
+		connection, // Pass connection without &mut
 		1,
 		WorkerInfo {
 			id: 123,
