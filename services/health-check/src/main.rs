@@ -1,14 +1,35 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use tonic::{Request, Response, Status};
+use tonic::transport::Server;
 
 use dotenv::dotenv;
-use models::models::health_check::{Header, HealthCheck, HealthCheckType, HttpMethod};
-use models::models::network::Network;
 
 pub mod db;
 pub mod health_check;
 
-use health_check::{schedule_health_checks, HealthCheckTask, WorkerInfo};
+mod worker_info {
+	include!("worker_info.rs");
+}
+
+use worker_info::health_check_service_server::HealthCheckService;
+use worker_info::{WorkerInfo, ScheduleHealthCheckResponse};
+
+#[derive(Default, Clone)]
+pub struct HealthCheckServer;
+
+#[tonic::async_trait]
+impl HealthCheckService for HealthCheckServer {
+    async fn schedule_health_checks(
+        &self,
+        request: Request<WorkerInfo>,
+    ) -> Result<Response<ScheduleHealthCheckResponse>, Status> {
+        println!("Got a request: {:?}", request);
+        
+        let reply = worker_info::ScheduleHealthCheckResponse {
+            message: format!("Health check scheduled for worker with ID: {}", request.into_inner().id),
+        };
+        Ok(Response::new(reply))
+    }
+}
 
 #[tokio::main]
 pub async fn main() {
@@ -16,6 +37,7 @@ pub async fn main() {
 
 	let mut connection = db::connection().await.unwrap();
 
+	/* Used for testing
 	let tasks_map: Arc<Mutex<HashMap<String, HealthCheckTask>>> =
 		Arc::new(Mutex::new(HashMap::new()));
 
@@ -47,4 +69,15 @@ pub async fn main() {
 		tasks_map.clone(),
 	)
 	.await;
+	*/
+
+	let addr = "0.0.0.0:50052".parse().unwrap();
+	let health_check_server = HealthCheckServer::default();
+
+	println!("Health Check Server listening on {}", addr);
+	Server::builder()
+		.add_service(health_check_server.clone())
+		.serve(addr)
+		.await
+		.unwrap();
 }
