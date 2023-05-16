@@ -12,6 +12,8 @@ FROM debian:bullseye-slim
 
 WORKDIR /runner
 
+EXPOSE 50052
+
 COPY --from=builder /usr/src/health-check/target/release/health-check health-check
 
 RUN ["cargo", "run"]
