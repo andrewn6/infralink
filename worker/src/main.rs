@@ -1,8 +1,3 @@
-use std::collections::HashMap;
-use std::time::Duration;
-
-use podman_api::models::{ContainerStats, ContainerStats200Response};
-use podman_api::Podman;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 

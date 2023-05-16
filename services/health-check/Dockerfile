@@ -4,8 +4,6 @@ WORKDIR /usr/src/health-check
 
 COPY . .
 
-RUN cargo fetch
-
 RUN cargo build --release
 
 FROM debian:bullseye-slim
