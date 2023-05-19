@@ -5,10 +5,6 @@ use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use anyhow::{Result, Context};
 
-fn main() {
-    println!("hello world")
-}
-
 #[derive(Deserialize)]
 struct NetdataResponse {
     labels: Vec<String>,
@@ -26,7 +22,7 @@ pub struct Metrics {
 }
 
 async fn fetch() -> Result<Metrics> {
-    // todo: implement netdata
+    // todo: implement netdata 
     Ok(Metrics {
         cpu: 0.0,
         memory: 0.0,
