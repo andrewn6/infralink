@@ -1,7 +1,8 @@
 use std::sync::atomic::{AtomicUsize, Ordering as OtherOrdering};
 
-use std::sync::mpsc::{self, Receiver};
-use std::sync::Arc;
+use std::sync::mpsc::{self};
+use std::sync::mpsc::{Receiver};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -12,7 +13,7 @@ use dotenv_codegen::dotenv;
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::{Notify};
 use futures_util::stream::StreamExt as FuturesStreamExt;
 use tracing::{error, info};
 use tracing_subscriber::fmt;
@@ -91,11 +92,11 @@ fn delete_vultr_instance(instance_id: &str) -> Result<String, Box<dyn std::error
 }
 
 async fn scale_down(
-	num_workers: &AtomicUsize,
-	worker_states: &mut Vec<WorkerState>,
-	channel: &Channel,
-	metrics_rx: mpsc::Receiver<Metrics>,
-	workload_threshold: f64,
+    num_workers: &AtomicUsize,
+    worker_states: &mut Vec<WorkerState>,
+    channel: &Channel,
+    metrics_rx: &mpsc::Receiver<Metrics>,
+    workload_threshold: f64,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let mut deleted_ids = Vec::new();
 
@@ -134,8 +135,10 @@ async fn scale_up(
 	num_workers: &mut usize,
 ) -> Result<WorkerState, Box<dyn std::error::Error + Send + Sync>> {
 
-	let rx = rx.lock().unwrap();
-	let metrics = rx.recv()?;
+	let metrics = {
+		let rx = rx.lock().unwrap();
+		rx.recv()?
+	};
 
 	info!("received metrics: {:?}", metrics);
 
@@ -214,13 +217,13 @@ pub async fn main() {
 	let scaling_factor = 2;
 
 	loop {
-		let metrics = metrics_rx.lock().await.recv().unwrap();
+		let metrics = metrics_rx.lock().expect("Failed to acquire lock").recv().expect("Failed to receive metrics");
 
 		if num_workers.load(OtherOrdering::SeqCst)  < (metrics.workload * scaling_factor as f64).round() as usize {
-			let num_workers_val = num_workers.load(OtherOrdering::SeqCst);
+			let mut num_workers_val = num_workers.load(OtherOrdering::SeqCst);
 			if let Ok(worker_state) = scale_up(
 				num_workers_val,
-				&Arc::new(std::sync::Mutex::new(rx)),
+				&Arc::new(Mutex::new(rx)),
 				&Arc::clone(&tx),
 				notify.clone(),
 				&channel,
@@ -265,7 +268,7 @@ pub async fn main() {
 				&num_workers,
 				&mut worker_states,
 				&channel,
-				rx,
+				&rx,
 				workload_threshold,
 			)
 			.await
