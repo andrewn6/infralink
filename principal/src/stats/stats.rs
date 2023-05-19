@@ -3,7 +3,7 @@ use tokio::time;
 use redis::{AsyncCommands, aio::Connection, Client};
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
-use anyhow::Result;
+use anyhow::{Result, Context};
 
 fn main() {
     println!("hello world")
@@ -39,8 +39,10 @@ async fn fetch() -> Result<Metrics> {
 
 async fn store(metrics: HashMap<String, Metrics>, conn: &mut Connection) -> Result<()> {
     for (key, value) in metrics {
-        let serialized_metrics = serde_json::to_string(&value)?;
-        conn.set(key, serialized_metrics).await?;
+        let serialized_metrics = serde_json::to_string(&value)
+            .context("Failed to serialize metrics")?;
+        conn.set::<_, _, ()>(key, serialized_metrics).await
+            .context("Failed to store metrics")?;
     }
     Ok(())
 }
