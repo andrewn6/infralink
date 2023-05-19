@@ -29,10 +29,6 @@ async fn main() {
 
 	let mut connection = db::connection().await.unwrap();
 
-	db::set_airport_ip(&mut connection, "ord", "108.61.202.18")
-		.await
-		.unwrap();
-
 	let ping_map = db::get_airport_ips(&mut connection).await.unwrap();
 
 	let ping_map = Arc::new(Mutex::new(ping_map));
@@ -40,45 +36,44 @@ async fn main() {
 	let ping_map_clone = Arc::clone(&ping_map);
 
 	let update_task = tokio::spawn(async move {
-		db::subscribe_to_changes(&mut *ping_map_clone.lock().await)
-			.await
-			.unwrap();
+		let mut ping_map_clone = {
+			let ping_map_guard = ping_map_clone.lock().await;
+			ping_map_guard.clone()
+		};
+
+		db::subscribe_to_changes(&mut ping_map_clone).await.unwrap();
 	});
 
 	println!("Starting ping server...");
 
 	let ping_task = tokio::spawn(async move {
 		loop {
-			{
+			let ping_map_copy = {
 				let ping_map_guard = ping_map.lock().await;
-				println!("Ping map: {:#?}", *ping_map_guard);
+				ping_map_guard.clone()
+			};
+
+			for (destination_region, ip) in ping_map_copy.iter() {
+				let destination_ip = IpAddr::from_str(ip).unwrap();
+
+				// Calculate the round trip time
+				let rtt = calculate_round_trip(destination_ip).await;
+
+				// Store the round trip time in Redis
+				db::store_ping(origin_region, destination_region, rtt)
+					.await
+					.unwrap();
+
+				println!(
+					"[{}] updated ping times from {} {} {} [{} milliseconds]",
+					chrono::Local::now().to_rfc3339().bright_black(),
+					origin_region.bright_cyan(),
+					"->".bright_magenta(),
+					destination_region.bright_green(),
+					rtt.to_string().bright_black()
+				);
 			}
 
-			{
-				let ping_map_guard = ping_map.lock().await;
-				for (destination_region, ip) in ping_map_guard.iter() {
-					let destination_ip = IpAddr::from_str(ip).unwrap();
-
-					// Calculate the round trip time
-					let rtt = calculate_round_trip(destination_ip).await;
-
-					// Store the round trip time in Redis
-					db::store_ping(origin_region, destination_region, rtt)
-						.await
-						.unwrap();
-
-					println!(
-						"[{}] updated ping times from {} {} {} [{} milliseconds]",
-						chrono::Local::now().to_rfc3339().bright_black(),
-						origin_region.bright_cyan(),
-						"->".bright_magenta(),
-						destination_region.bright_green(),
-						rtt.to_string().bright_black()
-					);
-				}
-			}
-
-			println!("Sleeping for 5 seconds...");
 			time::sleep(Duration::from_millis(5000)).await;
 		}
 	});
