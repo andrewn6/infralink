@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package stats;
+
+message ContainerStatsRequest {
+   string container_id = 1;
+}
+
+message ContainerStatsResponse {
+   double cpu_usage = 1;
+   double memory_usage = 2;
+   double network_io = 3;
+   double block_io = 4;
+}
+
+service ContainerStatsService {
+  rpc GetContainerStats(ContainerStatsRequest) returns (ContainerStatsResponse) {}
+}

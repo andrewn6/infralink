@@ -74,7 +74,7 @@ impl Greeter for MyGreeter {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let addr = "[::1]:50051".parse().unwrap();
 	let greeter = MyGreeter::default();
-	let docker_service = MyDockerService::default();
+	//let docker_service = MyDockerService::default();
 
 	let reflection_service = tonic_reflection::server::Builder::configure()
 		.register_encoded_file_descriptor_set(proto_memory::FILE_DESCRIPTOR_SET)
@@ -86,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	Server::builder()
 		.add_service(GreeterServer::new(greeter))
 		.add_service(reflection_service)
-		.add_service(DockerServiceServer::new(docker_service))
+		//.add_service(DockerServiceServer::new(docker_service))
 		.serve(addr)
 		.await?;
 

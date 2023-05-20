@@ -10,7 +10,7 @@ message Container {
   map<string, string> env = 5;
 }
 
-service DockerService { // change this
+service DockerService { 
   rpc CreatePod (Pod) returns (CreatePodResponse);
   rpc StartContainer (StartContainerRequest) returns (StartContainerResponse);
   rpc StopContainer (StopContainerRequest) returns (StopContainerResponse);
