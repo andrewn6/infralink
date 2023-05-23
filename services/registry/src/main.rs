@@ -1,23 +1,46 @@
 use futures_util::StreamExt;
-use hyper::body::HttpBody;
+use hyper::body::{to_bytes};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Method, Response, Server, StatusCode};
+use serde::Deserialize;
 use shiplift::{Docker, PullOptions};
 
 use std::convert::Infallible;
 use std::process::Command;
 use std::net::SocketAddr;
 
-async fn handle_push(mut req: Request<Body>, docker: Docker) -> Result<Response<Body>, Infallible> {
-	let mut body = Vec::new();
-	while let Some(chunk) = req.body_mut().data().await {
-		let chunk = chunk.unwrap();
-		body.extend_from_slice(&chunk);
+#[derive(Deserialize)]
+struct ImageData {
+	image_name: String,
+	image_tag: String,
+}
+
+async fn handle_push(mut req: Request<Body>, docker: Docker) -> Result<Response<Body>, hyper::Error> {
+	let whole_body = to_bytes(req.body_mut()).await?;
+	
+	let image_data: Result<ImageData, _> = serde_json::from_slice(&whole_body);
+
+	let image_data = match image_data {
+		Ok(data) => data,
+		Err(e) => {
+			eprintln!("Failed to parse request: {}", e);
+			return Ok(Response::builder()
+				.status(StatusCode::BAD_REQUEST)
+				.body(Body::from("Failed to parse request"))
+				.unwrap());
+		}
+	};
+
+	if image_data.image_name.is_empty() || image_data.image_tag.is_empty() {
+		return Ok(Response::builder()
+			.status(StatusCode::BAD_REQUEST)
+			.body(Body::from("Image name or tag is empty"))
+			.unwrap());
 	}
 
 	// Update this to not be hard coded
-	let image_name = "registry/image-name:latest";
-	let pull_options = PullOptions::builder().image(image_name).build();
+	let image = format!("{}:{}", image_data.image_name, image_data.image_tag);
+	let pull_options = PullOptions::builder().image(&image).build();
 	let mut stream = docker.images().pull(&pull_options);
 
 	while let Some(result) = stream.next().await {
@@ -29,12 +52,12 @@ async fn handle_push(mut req: Request<Body>, docker: Docker) -> Result<Response<
 
 	let output = Command::new("docker")
 		.arg("push")
-		.arg(image_name)
+		.arg(image)
 		.output()
-		.expect("failed to execute process");
+		.expect("Failed to execute process");
 
 	if output.status.success() {
-		Ok(Response::new(Body::from("image pushed successfully")))
+		Ok(Response::new(Body::from("Image pushed successfully!")))
 	} else {
 		let error_message = String::from_utf8_lossy(&output.stderr).into_owned();
 		eprintln!("error: {}", error_message);
@@ -46,9 +69,31 @@ async fn handle_push(mut req: Request<Body>, docker: Docker) -> Result<Response<
 
 }
 
-async fn handle_pull(_req: Request<Body>, docker: Docker) -> Result<Response<Body>, Infallible> {
-	let image_name = "registry/image-name:latest";
-	let pull_options = shiplift::PullOptions::builder().image(image_name).build();
+async fn handle_pull(mut req: Request<Body>, docker: Docker) -> Result<Response<Body>, hyper::Error> {
+	let whole_body = to_bytes(req.body_mut()).await?;
+	
+	let image_data: Result<ImageData, _> = serde_json::from_slice(&whole_body);
+
+	let image_data = match image_data {
+		Ok(data) => data,
+		Err(e) => {
+			eprintln!("Failed to parse request: {}", e);
+			return Ok(Response::builder()
+				.status(StatusCode::BAD_REQUEST)
+				.body(Body::from("Failed to parse request"))
+				.unwrap());
+		}
+	};
+
+	if image_data.image_name.is_empty() || image_data.image_tag.is_empty() {
+		return Ok(Response::builder()
+			.status(StatusCode::BAD_REQUEST)
+			.body(Body::from("Image name or tag is empty"))
+			.unwrap());
+	}
+	
+	let image = format!("{}:{}", image_data.image_name, image_data.image_tag);
+	let pull_options = shiplift::PullOptions::builder().image(&image).build();
 	let mut stream = docker.images().pull(&pull_options);
 
 	while let Some(result) = stream.next().await {
@@ -58,10 +103,10 @@ async fn handle_pull(_req: Request<Body>, docker: Docker) -> Result<Response<Bod
 		}
 	}
 	
-	Ok(Response::new(Body::from("image pulled successfully")))
+	Ok(Response::new(Body::from("Image pulled successfully")))
 }
 
-async fn handle_request(req: Request<Body>, docker: Docker) -> Result<Response<Body>, Infallible> {
+async fn handle_request(req: Request<Body>, docker: Docker) -> Result<Response<Body>, hyper::Error> {
 	match (req.method(), req.uri().path()) {
 		(&Method::POST, "/push") => handle_push(req, docker).await,
 		(&Method::GET, "/pull") => handle_pull(req, docker).await,
