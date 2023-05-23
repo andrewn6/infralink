@@ -11,6 +11,7 @@ use std::net::SocketAddr;
 
 #[derive(Deserialize)]
 struct ImageData {
+	registry_url: String,
 	image_name: String,
 	image_tag: String,
 }
@@ -39,7 +40,7 @@ async fn handle_push(mut req: Request<Body>, docker: Docker) -> Result<Response<
 	}
 
 	// Update this to not be hard coded
-	let image = format!("{}:{}", image_data.image_name, image_data.image_tag);
+	let image = format!("{}/{}:{}", image_data.registry_url, image_data.image_name, image_data.image_tag);
 	let pull_options = PullOptions::builder().image(&image).build();
 	let mut stream = docker.images().pull(&pull_options);
 
@@ -92,7 +93,7 @@ async fn handle_pull(mut req: Request<Body>, docker: Docker) -> Result<Response<
 			.unwrap());
 	}
 	
-	let image = format!("{}:{}", image_data.image_name, image_data.image_tag);
+	let image = format!("{}/{}:{}", image_data.registry_url, image_data.image_name, image_data.image_tag);
 	let pull_options = shiplift::PullOptions::builder().image(&image).build();
 	let mut stream = docker.images().pull(&pull_options);
 
