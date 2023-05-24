@@ -2,12 +2,17 @@ use futures_util::StreamExt;
 use hyper::body::{to_bytes};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Method, Response, Server, StatusCode};
-use serde::Deserialize;
+use serde::{Deserialize};
 use shiplift::{Docker, PullOptions};
 
 use std::convert::Infallible;
 use std::process::Command;
 use std::net::SocketAddr;
+
+use std::time::Duration;
+use tokio::time::interval;
+use tower::ServiceBuilder;
+use tower::limit::{RateLimitLayer};
 
 #[derive(Deserialize)]
 struct ImageData {
@@ -118,6 +123,10 @@ async fn handle_request(req: Request<Body>, docker: Docker) -> Result<Response<B
 	}
 }
 
+async fn service_fn_wrapper(req: Request<Body>, docker: Docker) -> Result<Response<Body>, hyper::Error> {
+	Ok(service_fn(move |req| handle_request(req, docker.clone()))).await.unwrap();
+}
+
 #[tokio::main]
 async fn main() {
 	let docker = Docker::new();
@@ -126,8 +135,11 @@ async fn main() {
 
 	let make_svc = make_service_fn(move |_conn| {
 		let docker = docker.clone();
+		let rate_limit_service = ServiceBuilder::new()
+			.layer(RateLimitLayer::new(100, interval(Duration::from_secs(1))))
+			.service_fn(move |req| service_fn_wrapper(req, docker.clone()));
 		async move {
-			Ok::<_, Infallible>(service_fn(move |req| handle_request(req, docker.clone())))
+			Ok::<_, Infallible>(rate_limit_service)
 		}
 	});
 
