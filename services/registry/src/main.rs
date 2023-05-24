@@ -43,7 +43,7 @@ async fn handle_push(mut req: Request<Body>, docker: Docker) -> Result<Response<
 	let image = format!("{}/{}:{}", image_data.registry_url, image_data.image_name, image_data.image_tag);
 	let pull_options = PullOptions::builder().image(&image).build();
 	let mut stream = docker.images().pull(&pull_options);
-
+	
 	while let Some(result) = stream.next().await {
 		match result {
 			Ok(output) => println!("Pull event: {:?}", output),

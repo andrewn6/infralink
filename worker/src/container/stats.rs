@@ -67,7 +67,7 @@ fn process_stats(stats: &Stats) -> Result<ContainerStatsResponse, &'static str> 
 
     let response = ContainerStatsResponse {
         cpu_usage,
-        memory_usage: memory_usage as f64,
+        memory_usage,
         network_io,
         block_io,
     };

@@ -8,11 +8,9 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use futures_util::TryStreamExt;
 use lapin::types::FieldTable;
-use reqwest::blocking::Client;
 use dotenv_codegen::dotenv;
 
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tokio::sync::{Notify};
 use futures_util::stream::StreamExt as FuturesStreamExt;
 use tracing::{error, info};
@@ -22,9 +20,10 @@ use tracing_subscriber::prelude::*;
 use lapin::options::{BasicAckOptions, QueueDeclareOptions, BasicConsumeOptions, BasicPublishOptions};
 use lapin::{Channel, Connection, ConnectionProperties, BasicProperties};
 
-
 const VULTR_API_KEY: &str = dotenv!("VULTR_API_KEY");
 const VULTR_API_BASE: &str = "https://api.vultr.com/v2/";
+
+use worker::stats::{ContainerStatsRequest, ContainerStatsResponse, container_stats_service_client::ContainerStatsServiceClient};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Metrics {
@@ -46,6 +45,7 @@ pub struct WorkerState {
 	pub workload: f64,
 }
 
+/* 
 fn create_vultr_instance(worker_id: usize) -> Result<String, Box<dyn std::error::Error>> {
 	let client = Client::new();
 
@@ -71,7 +71,9 @@ fn create_vultr_instance(worker_id: usize) -> Result<String, Box<dyn std::error:
 		)))
 	}
 }
+*/
 
+/* 
 fn delete_vultr_instance(instance_id: &str) -> Result<String, Box<dyn std::error::Error>> {
 	let client = Client::new();
 
@@ -90,7 +92,7 @@ fn delete_vultr_instance(instance_id: &str) -> Result<String, Box<dyn std::error
 		)))
 	}
 }
-
+*/
 async fn scale_down(
     num_workers: &AtomicUsize,
     worker_states: &mut Vec<WorkerState>,
@@ -130,7 +132,7 @@ async fn scale_up(
 	id: usize,
 	rx: &std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Receiver<Metrics>>>,
 	tx: &std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Sender<Metrics>>>,
-	notify: Arc<tokio::sync::Notify>,
+	notify: Arc<tokio::sync::Notify>, 
 	channel: &Channel,
 	num_workers: &mut usize,
 ) -> Result<WorkerState, Box<dyn std::error::Error + Send + Sync>> {
@@ -221,9 +223,10 @@ pub async fn main() {
 
 		if num_workers.load(OtherOrdering::SeqCst)  < (metrics.workload * scaling_factor as f64).round() as usize {
 			let mut num_workers_val = num_workers.load(OtherOrdering::SeqCst);
+			let rx = Arc::new(Mutex::new(rx));
 			if let Ok(worker_state) = scale_up(
 				num_workers_val,
-				&Arc::new(Mutex::new(rx)),
+				&rx,
 				&Arc::clone(&tx),
 				notify.clone(),
 				&channel,

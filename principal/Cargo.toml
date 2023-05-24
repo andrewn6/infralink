@@ -7,6 +7,7 @@ workspace = ".."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+worker = { path = "../worker" }
 dotenv = "0.15.0"
 serde = { version = "1.0.160", features = ["derive"] }
 reqwest = { version = "0.11.16", features = ["rustls-tls", "json", "blocking"] }
