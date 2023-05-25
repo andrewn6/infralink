@@ -71,61 +71,49 @@ pub enum Africa {
 impl ToString for Region {
 	fn to_string(&self) -> String {
 		match self {
-			Region::Asia(city) => {
-				match city {
-					Asia::Tokyo => "Tokyo".to_string(),
-					Asia::Osaka => "Osaka".to_string(),
-					Asia::Seoul => "Seoul".to_string(),
-					Asia::Singapore => "Singapore".to_string(),
-					Asia::Mumbai => "Mumbai".to_string(),
-					Asia::TelAviv => "Tel Aviv".to_string(),
-					Asia::Bangalore => "Bangalore".to_string(),
-					Asia::Delhi => "Delhi".to_string(),
-				}
-			}
-			Region::Australia(city) => {
-				match city {
-					Australia::Sydney => "Sydney".to_string(),
-					Australia::Melbourne => "Melbourne".to_string(),
-				}
-			}
-			Region::Europe(city) => {
-				match city {
-					Europe::Amsterdam => "Amsterdam".to_string(),
-					Europe::London => "London".to_string(),
-					Europe::Frankfurt => "Frankfurt".to_string(),
-					Europe::Paris => "Paris".to_string(),
-					Europe::Warsaw => "Warsaw".to_string(),
-					Europe::Madrid => "Madrid".to_string(),
-					Europe::Stockholm => "Stockholm".to_string(),
-				}
-			}
-			Region::NorthAmerica(city) => {
-				match city {
-					NorthAmerica::NewJersey => "New Jersey".to_string(),
-					NorthAmerica::Chicago => "Chicago".to_string(),
-					NorthAmerica::Dallas => "Dallas".to_string(),
-					NorthAmerica::Seattle => "Seattle".to_string(),
-					NorthAmerica::LosAngeles => "Los Angeles".to_string(),
-					NorthAmerica::Atlanta => "Atlanta".to_string(),
-					NorthAmerica::SiliconValley => "Silicon Valley".to_string(),
-					NorthAmerica::Toronto => "Toronto".to_string(),
-					NorthAmerica::Miami => "Miami".to_string(),
-					NorthAmerica::MexicoCity => "Mexico City".to_string(),
-					NorthAmerica::Honolulu => "Honolulu".to_string(),
-				}
-			}
-			Region::SouthAmerica(city) => {
-				match city {
-					SouthAmerica::SaoPaulo => "Sao Paulo".to_string(),
-					SouthAmerica::Santiago => "Santiago".to_string(),
-				}
-			}
-			Region::Africa(city) => {
-				match city {
-					Africa::Johannesburg => "Johannesburg".to_string(),
-				}
-			}
+			Region::Asia(city) => match city {
+				Asia::Tokyo => "Tokyo".to_string(),
+				Asia::Osaka => "Osaka".to_string(),
+				Asia::Seoul => "Seoul".to_string(),
+				Asia::Singapore => "Singapore".to_string(),
+				Asia::Mumbai => "Mumbai".to_string(),
+				Asia::TelAviv => "Tel Aviv".to_string(),
+				Asia::Bangalore => "Bangalore".to_string(),
+				Asia::Delhi => "Delhi".to_string(),
+			},
+			Region::Australia(city) => match city {
+				Australia::Sydney => "Sydney".to_string(),
+				Australia::Melbourne => "Melbourne".to_string(),
+			},
+			Region::Europe(city) => match city {
+				Europe::Amsterdam => "Amsterdam".to_string(),
+				Europe::London => "London".to_string(),
+				Europe::Frankfurt => "Frankfurt".to_string(),
+				Europe::Paris => "Paris".to_string(),
+				Europe::Warsaw => "Warsaw".to_string(),
+				Europe::Madrid => "Madrid".to_string(),
+				Europe::Stockholm => "Stockholm".to_string(),
+			},
+			Region::NorthAmerica(city) => match city {
+				NorthAmerica::NewJersey => "New Jersey".to_string(),
+				NorthAmerica::Chicago => "Chicago".to_string(),
+				NorthAmerica::Dallas => "Dallas".to_string(),
+				NorthAmerica::Seattle => "Seattle".to_string(),
+				NorthAmerica::LosAngeles => "Los Angeles".to_string(),
+				NorthAmerica::Atlanta => "Atlanta".to_string(),
+				NorthAmerica::SiliconValley => "Silicon Valley".to_string(),
+				NorthAmerica::Toronto => "Toronto".to_string(),
+				NorthAmerica::Miami => "Miami".to_string(),
+				NorthAmerica::MexicoCity => "Mexico City".to_string(),
+				NorthAmerica::Honolulu => "Honolulu".to_string(),
+			},
+			Region::SouthAmerica(city) => match city {
+				SouthAmerica::SaoPaulo => "Sao Paulo".to_string(),
+				SouthAmerica::Santiago => "Santiago".to_string(),
+			},
+			Region::Africa(city) => match city {
+				Africa::Johannesburg => "Johannesburg".to_string(),
+			},
 			Region::Unknown => "Unknown".to_string(),
 		}
 	}
@@ -134,61 +122,49 @@ impl ToString for Region {
 impl Region {
 	fn code(&self) -> String {
 		match self {
-			Region::Asia(city) => {
-				match city {
-					Asia::Tokyo => "nrt".to_string(),
-					Asia::Osaka => "itm".to_string(),
-					Asia::Seoul => "icn".to_string(),
-					Asia::Singapore => "sgp".to_string(),
-					Asia::Mumbai => "bom".to_string(),
-					Asia::TelAviv => "tlv".to_string(),
-					Asia::Bangalore => "blr".to_string(),
-					Asia::Delhi => "del".to_string(),
-				}
-			}
-			Region::Australia(city) => {
-				match city {
-					Australia::Sydney => "syd".to_string(),
-					Australia::Melbourne => "mel".to_string(),
-				}
-			}
-			Region::Europe(city) => {
-				match city {
-					Europe::Amsterdam => "ams".to_string(),
-					Europe::London => "lhr".to_string(),
-					Europe::Frankfurt => "fra".to_string(),
-					Europe::Paris => "cdg".to_string(),
-					Europe::Warsaw => "waw".to_string(),
-					Europe::Madrid => "mad".to_string(),
-					Europe::Stockholm => "sto".to_string(),
-				}
-			}
-			Region::NorthAmerica(city) => {
-				match city {
-					NorthAmerica::NewJersey => "ewr".to_string(),
-					NorthAmerica::Chicago => "ord".to_string(),
-					NorthAmerica::Dallas => "dfw".to_string(),
-					NorthAmerica::Seattle => "sea".to_string(),
-					NorthAmerica::LosAngeles => "lax".to_string(),
-					NorthAmerica::Atlanta => "atl".to_string(),
-					NorthAmerica::SiliconValley => "sjc".to_string(),
-					NorthAmerica::Toronto => "yto".to_string(),
-					NorthAmerica::Miami => "mia".to_string(),
-					NorthAmerica::MexicoCity => "mex".to_string(),
-					NorthAmerica::Honolulu => "hnl".to_string(),
-				}
-			}
-			Region::SouthAmerica(city) => {
-				match city {
-					SouthAmerica::SaoPaulo => "sao".to_string(),
-					SouthAmerica::Santiago => "scl".to_string(),
-				}
-			}
-			Region::Africa(city) => {
-				match city {
-					Africa::Johannesburg => "jnb".to_string(),
-				}
-			}
+			Region::Asia(city) => match city {
+				Asia::Tokyo => "nrt".to_string(),
+				Asia::Osaka => "itm".to_string(),
+				Asia::Seoul => "icn".to_string(),
+				Asia::Singapore => "sgp".to_string(),
+				Asia::Mumbai => "bom".to_string(),
+				Asia::TelAviv => "tlv".to_string(),
+				Asia::Bangalore => "blr".to_string(),
+				Asia::Delhi => "del".to_string(),
+			},
+			Region::Australia(city) => match city {
+				Australia::Sydney => "syd".to_string(),
+				Australia::Melbourne => "mel".to_string(),
+			},
+			Region::Europe(city) => match city {
+				Europe::Amsterdam => "ams".to_string(),
+				Europe::London => "lhr".to_string(),
+				Europe::Frankfurt => "fra".to_string(),
+				Europe::Paris => "cdg".to_string(),
+				Europe::Warsaw => "waw".to_string(),
+				Europe::Madrid => "mad".to_string(),
+				Europe::Stockholm => "sto".to_string(),
+			},
+			Region::NorthAmerica(city) => match city {
+				NorthAmerica::NewJersey => "ewr".to_string(),
+				NorthAmerica::Chicago => "ord".to_string(),
+				NorthAmerica::Dallas => "dfw".to_string(),
+				NorthAmerica::Seattle => "sea".to_string(),
+				NorthAmerica::LosAngeles => "lax".to_string(),
+				NorthAmerica::Atlanta => "atl".to_string(),
+				NorthAmerica::SiliconValley => "sjc".to_string(),
+				NorthAmerica::Toronto => "yto".to_string(),
+				NorthAmerica::Miami => "mia".to_string(),
+				NorthAmerica::MexicoCity => "mex".to_string(),
+				NorthAmerica::Honolulu => "hnl".to_string(),
+			},
+			Region::SouthAmerica(city) => match city {
+				SouthAmerica::SaoPaulo => "sao".to_string(),
+				SouthAmerica::Santiago => "scl".to_string(),
+			},
+			Region::Africa(city) => match city {
+				Africa::Johannesburg => "jnb".to_string(),
+			},
 			Region::Unknown => "Unknown".to_string(),
 		}
 	}

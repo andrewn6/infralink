@@ -1,5 +1,5 @@
-use bollard::Docker;
 use bollard::container::{Config, CreateContainerOptions, RemoveContainerOptions};
+use bollard::Docker;
 
 use std::collections::HashMap;
 use tonic::{Request, Response, Status};
@@ -8,7 +8,9 @@ mod docker {
 	include!("../docker.rs");
 }
 
-use docker::{StartContainerRequest, StopContainerRequest, DeleteContainerRequest, Pod, CreatePodResponse};
+use docker::{
+	CreatePodResponse, DeleteContainerRequest, Pod, StartContainerRequest, StopContainerRequest,
+};
 
 #[tonic::async_trait]
 pub trait DockerService {
@@ -26,11 +28,11 @@ pub trait DockerService {
 		&self,
 		request: Request<StopContainerRequest>,
 	) -> Result<Response<()>, Status>;
-	
+
 	async fn delete_container(
 		&self,
 		request: Request<DeleteContainerRequest>,
-	) -> Result <Response<()>, Status>;
+	) -> Result<Response<()>, Status>;
 }
 
 pub struct MyDockerService {}
@@ -40,7 +42,7 @@ impl DockerService for MyDockerService {
 	async fn create_container(
 		&self,
 		request: Request<Pod>,
-	) -> Result<Response<CreatePodResponse>, Status> {	
+	) -> Result<Response<CreatePodResponse>, Status> {
 		let request = request.into_inner();
 
 		let docker = Docker::connect_with_local_defaults().unwrap();
@@ -52,33 +54,34 @@ impl DockerService for MyDockerService {
 
 		let config = Config {
 			image: Some(request.containers[0].image.clone()),
-			env: Some(request
-				.containers[0]
-				.env
-				.iter()
-				.map(|(k, v)| format!("{}={}", k, v))
-				.collect::<Vec<_>>()),
+			env: Some(
+				request.containers[0]
+					.env
+					.iter()
+					.map(|(k, v)| format!("{}={}", k, v))
+					.collect::<Vec<_>>(),
+			),
 			cmd: Some(request.containers[0].commands.clone()),
 			exposed_ports: Some(exposed_ports),
 			..Default::default()
 		};
 
-		let options = Some(CreateContainerOptions { 
+		let options = Some(CreateContainerOptions {
 			name: request.containers[0].name.clone(),
 			platform: Some("linux/amd64".to_owned()),
 		});
 
 		match docker.create_container(options, config).await {
-        	Ok(container) => {
-            	let message = format!("Created container with ID: {}", container.id);
-            	let response = CreatePodResponse { message };
-            	Ok(Response::new(response))
-        	}
-        	Err(err) => {
-            	eprintln!("Error creating container: {:?}", err);
-            	Err(Status::internal("Failed to create container"))
-        	}
-    }
+			Ok(container) => {
+				let message = format!("Created container with ID: {}", container.id);
+				let response = CreatePodResponse { message };
+				Ok(Response::new(response))
+			}
+			Err(err) => {
+				eprintln!("Error creating container: {:?}", err);
+				Err(Status::internal("Failed to create container"))
+			}
+		}
 	}
 
 	async fn start_container(
@@ -88,8 +91,11 @@ impl DockerService for MyDockerService {
 		let request = request.into_inner();
 
 		let docker = Docker::connect_with_local_defaults().unwrap();
-	
-		match docker.start_container::<String>(&request.container_id, None).await {
+
+		match docker
+			.start_container::<String>(&request.container_id, None)
+			.await
+		{
 			Ok(_) => Ok(Response::new(())),
 
 			Err(err) => {
@@ -97,7 +103,6 @@ impl DockerService for MyDockerService {
 				Err(Status::internal("Failed to start container"))
 			}
 		}
-		
 	}
 
 	async fn stop_container(
@@ -120,7 +125,7 @@ impl DockerService for MyDockerService {
 	async fn delete_container(
 		&self,
 		request: Request<DeleteContainerRequest>,
-	) -> Result <Response<()>, Status> {
+	) -> Result<Response<()>, Status> {
 		let request = request.into_inner();
 
 		let docker = Docker::connect_with_local_defaults().unwrap();
@@ -131,7 +136,10 @@ impl DockerService for MyDockerService {
 			..Default::default()
 		});
 
-		match docker.remove_container(&request.container_id, options).await {
+		match docker
+			.remove_container(&request.container_id, options)
+			.await
+		{
 			Ok(_) => Ok(Response::new(())),
 			Err(err) => {
 				eprintln!("Error deleting container: {:?}", err);

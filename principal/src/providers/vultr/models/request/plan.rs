@@ -147,14 +147,14 @@ impl Plan {
 
 	// Find a plan that matches the given compute
 	fn find(instance_type: InstanceType, comparison_compute: Compute) -> Option<Self> {
-		Self::list(instance_type).into_iter().find(|plan| {
-			match plan {
+		Self::list(instance_type)
+			.into_iter()
+			.find(|plan| match plan {
 				Plan::GeneralPurpose(compute) | Plan::CPUOptimized(compute) => {
 					compute.vcpu == comparison_compute.vcpu && compute.ram == comparison_compute.ram
 				}
 				_ => false,
-			}
-		})
+			})
 	}
 
 	pub fn code(&self) -> String {
@@ -180,11 +180,9 @@ impl Plan {
 				let plan = Self::find(InstanceType::GeneralPurpose, compute.clone());
 
 				// Use unwrap_or_else to provide a default value in case the plan is not found
-				let disk_size = plan.map_or(0, |p| {
-					match p {
-						Plan::GeneralPurpose(c) => c.disk.unwrap(),
-						_ => 0,
-					}
+				let disk_size = plan.map_or(0, |p| match p {
+					Plan::GeneralPurpose(c) => c.disk.unwrap(),
+					_ => 0,
 				});
 
 				format!(
@@ -198,11 +196,9 @@ impl Plan {
 			Plan::CPUOptimized(compute) => {
 				let plan = Self::find(InstanceType::CPUOptimized, compute.clone());
 
-				let disk_size = plan.map_or(0, |p| {
-					match p {
-						Plan::CPUOptimized(c) => c.disk.unwrap(),
-						_ => 0,
-					}
+				let disk_size = plan.map_or(0, |p| match p {
+					Plan::CPUOptimized(c) => c.disk.unwrap(),
+					_ => 0,
 				});
 
 				format!(

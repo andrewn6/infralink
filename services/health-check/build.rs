@@ -2,9 +2,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-	let proto_files = vec![
-		"./proto/worker_info.proto",
-	];
+	let proto_files = vec!["./proto/worker_info.proto"];
 
 	let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
