@@ -123,9 +123,10 @@ async fn handle_request(req: Request<Body>, docker: Docker) -> Result<Response<B
 	}
 }
 
-async fn service_fn_wrapper(req: Request<Body>, docker: Docker) -> Result<Response<Body>, hyper::Error> {
-	Ok(service_fn(move |req| handle_request(req, docker.clone()))).await.unwrap();
+fn service_fn_wrapper(docker: Docker) -> impl Fn(Request<Body>) -> _ {
+    move |req| handle_request(req, docker.clone())
 }
+
 
 #[tokio::main]
 async fn main() {
@@ -134,14 +135,14 @@ async fn main() {
 	let addr: SocketAddr = ([127, 0, 0, 1], 8083).into();
 
 	let make_svc = make_service_fn(move |_conn| {
-		let docker = docker.clone();
-		let rate_limit_service = ServiceBuilder::new()
-			.layer(RateLimitLayer::new(100, interval(Duration::from_secs(1))))
-			.service_fn(move |req| service_fn_wrapper(req, docker.clone()));
-		async move {
-			Ok::<_, Infallible>(rate_limit_service)
-		}
-	});
+        let docker = docker.clone();
+        let rate_limit_service = ServiceBuilder::new()
+            .layer(RateLimitLayer::new(100, interval(Duration::from_secs(1))))
+            .service_fn(service_fn_wrapper(docker.clone()));
+        async move {
+            Ok::<_, Infallible>(rate_limit_service)
+        }
+    });
 
 	let server = Server::bind(&addr)
 		.serve(make_svc);
