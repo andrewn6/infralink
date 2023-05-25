@@ -11,8 +11,6 @@ use std::net::SocketAddr;
 
 use std::time::Duration;
 use tokio::time::interval;
-use tower::ServiceBuilder;
-use tower::limit::rate::RateLimitLayer;
 
 #[derive(Deserialize)]
 struct ImageData {
@@ -123,9 +121,11 @@ async fn handle_request(req: Request<Body>, docker: Docker) -> Result<Response<B
 	}
 }
 
+/* 
 fn service_fn_wrapper(docker: Docker) -> impl Fn(Request<Body>) -> futures_util::future::Ready<Result<Response<Body>, hyper::Error>> {
     move |req| futures_util::future::ready(handle_request(req, docker.clone()))
 }
+*/
 
 
 #[tokio::main]
@@ -135,14 +135,11 @@ async fn main() {
 	let addr: SocketAddr = ([127, 0, 0, 1], 8083).into();
 
 	let make_svc = make_service_fn(move |_conn| {
-        let docker = docker.clone();
-        let rate_limit_service = ServiceBuilder::new()
-            .layer(RateLimitLayer::new(100, interval(Duration::from_secs(1))))
-            .service_fn(service_fn_wrapper(docker.clone()));
-        async move {
-            Ok::<_, Infallible>(rate_limit_service)
-        }
-    });
+		let docker = docker.clone();
+		async move {
+			Ok::<_, Infallible>(service_fn(move |req| handle_request(req, docker.clone())))
+		}
+	});
 
 	let server = Server::bind(&addr)
 		.serve(make_svc);
