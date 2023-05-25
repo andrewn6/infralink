@@ -12,7 +12,7 @@ use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::time::interval;
 use tower::ServiceBuilder;
-use tower::rate_limit::{RateLimitLayer};
+use tower::limit::rate::RateLimitLayer;
 
 #[derive(Deserialize)]
 struct ImageData {
@@ -123,8 +123,8 @@ async fn handle_request(req: Request<Body>, docker: Docker) -> Result<Response<B
 	}
 }
 
-fn service_fn_wrapper(docker: Docker) -> impl Fn(Request<Body>) -> _ {
-    move |req| handle_request(req, docker.clone())
+fn service_fn_wrapper(docker: Docker) -> impl Fn(Request<Body>) -> futures_util::future::Ready<Result<Response<Body>, hyper::Error>> {
+    move |req| futures_util::future::ready(handle_request(req, docker.clone()))
 }
 
 
