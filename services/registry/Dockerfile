@@ -6,7 +6,7 @@ COPY . .
 
 RUN cargo build --release
 
-FROM debian:bull-eye-slim 
+FROM debian:bullseye-slim
 
 WORKDIR /runner
 
