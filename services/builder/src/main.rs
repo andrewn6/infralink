@@ -1,46 +1,55 @@
-pub mod db;
 use hyper::body::to_bytes;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode, Method};
+use nixpacks::nixpacks::builder::docker::DockerBuilderOptions;
+
 use std::process::{Command, Child};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use serde::Deserialize;
+use nixpacks::{generate_build_plan, BuildPlan, GeneratePlanOptions, create_docker_image};
 
+use serde::Deserialize;
 use futures::{futures::{self, FutureResult}, Future, StreamExt};
 use dotenv::dotenv;
 
-type SharedChild = Arc<Mutex<Option<Child>>>;
+type SharedChild = Arc<Mutex<Option<BuildPlan>>>;
 
 
 #[derive(Deserialize)]
 struct BuildInfo {
 	pub path: String,
 	pub name: String,
+	pub envs: Vec<String>,
+	pub build_options: DockerBuilderOptions,
 }
 
-fn handle(req: Request<Body>, child_handle: SharedChild) -> impl Future<Item=Response<Body>, Error=hyper::Error> {
+async fn handle(req: Request<Body>, child_handle: SharedChild) -> impl Future<Item=Response<Body>, Error=hyper::Error> {
 	match (req.method(), req.uri().path()) {
 		(&Method::POST, "/build") => {
 			let whole_body = to_bytes(req.into_body()).await?;
-			let build_info: BuildInfo = serde_json::from_slice(&whole_body).unwrap();
+			let build_info: BuildInfo = serde_json::from_sli8ce(&whole_body).unwrap();
 
-			let mut child = Command::new("nixpacks")
-				.arg("build")
-				.arg(&build_info.path)
-				.arg("--name")
-				.arg(&build_info.name)
-				.spawn()
-				.expect("Failed to build");
+			let plan_options = GeneratePlanOptions {
+				path: build_info.path,
+				name: build_info.name,
+				..Default::default()
+			};
 
-		    *child_handle.lock().unwrap( )= Some(child);
+			let result = create_docker_image(&build_info.path, build_info.envs.iter().map(AsRef::as_ref).collect(), &plan_options, &build_info.build_options).await;
 
-			Ok(Response::new(Body::from("Build process started.")))
+			match result {
+				Ok(_) => Ok(Response::new(Body::from("Image created."))),
+				Err(e) => {
+					let mut response = Response::new(Body::from(format!("Failed to create image: {}", e)));
+					*response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+					Ok(response)
+				}
+			}
 		}
 	}
 }
 
-fn main() {
+async fn main() {
 	dotenv().unwrap();
 	
 	let child_handle = Arc::new(Mutex::new(None));
@@ -52,7 +61,7 @@ fn main() {
 		}
 	}));
 
-	let addr = ([127, 0, 0, 1], 8083).into();
+	let addr = ([127, 0, 0, 1], 8084).into();
 	let server = Server::bind(&addr).serve(service);
 
 	println!("Server listening on {}", addr);
