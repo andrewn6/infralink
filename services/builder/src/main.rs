@@ -1,19 +1,17 @@
 use hyper::body::to_bytes;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server, StatusCode, Method};
-use nixpacks::nixpacks::builder::docker::DockerBuilderOptions;
+use hyper::{Body, Request, Response, Server, StatusCode, Method, Error};
 
-use std::process::{Command, Child};
-use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
-use nixpacks::{generate_build_plan, BuildPlan, GeneratePlanOptions, create_docker_image};
+use nixpacks::nixpacks::builder::docker::DockerBuilderOptions as NixpacksOptions;
+use nixpacks::nixpacks::plan::generator::GeneratePlanOptions;
+use nixpacks::nixpacks::plan::BuildPlan;
+use nixpacks::{create_docker_image, generate_build_plan};
 
 use serde::Deserialize;
-use futures::{futures::{self, FutureResult}, Future, StreamExt};
 use dotenv::dotenv;
+use std::sync::{Arc, Mutex};
 
 type SharedChild = Arc<Mutex<Option<BuildPlan>>>;
-
 
 #[derive(Deserialize)]
 struct BuildInfo {
@@ -23,20 +21,64 @@ struct BuildInfo {
 	pub build_options: DockerBuilderOptions,
 }
 
-async fn handle(req: Request<Body>, child_handle: SharedChild) -> impl Future<Item=Response<Body>, Error=hyper::Error> {
+#[derive(Deserialize, Clone, Default, Debug)]
+pub struct DockerBuilderOptions {
+    pub name: Option<String>,
+    pub out_dir: Option<String>,
+    pub print_dockerfile: bool,
+    pub tags: Vec<String>,
+    pub labels: Vec<String>,
+    pub quiet: bool,
+    pub cache_key: Option<String>,
+    pub no_cache: bool,
+    pub inline_cache: bool,
+    pub cache_from: Option<String>,
+    pub platform: Vec<String>,
+    pub current_dir: bool,
+    pub no_error_without_start: bool,
+    pub incremental_cache_image: Option<String>,
+    pub verbose: bool,
+}
+
+fn convert_to_nixpacks_options(local_options: &DockerBuilderOptions) -> NixpacksOptions {
+	NixpacksOptions {
+        name: local_options.name.clone(),
+        out_dir: local_options.out_dir.clone(),
+        print_dockerfile: local_options.print_dockerfile,
+        tags: local_options.tags.clone(),
+        labels: local_options.labels.clone(),
+        quiet: local_options.quiet,
+        cache_key: local_options.cache_key.clone(),
+        no_cache: local_options.no_cache,
+        inline_cache: local_options.inline_cache,
+        cache_from: local_options.cache_from.clone(),
+        platform: local_options.platform.clone(),
+        current_dir: local_options.current_dir,
+        no_error_without_start: local_options.no_error_without_start,
+        incremental_cache_image: local_options.incremental_cache_image.clone(),
+        verbose: local_options.verbose,
+    }
+}
+async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Response<Body>, Error> {
 	match (req.method(), req.uri().path()) {
 		(&Method::POST, "/build") => {
 			let whole_body = to_bytes(req.into_body()).await?;
-			let build_info: BuildInfo = serde_json::from_sli8ce(&whole_body).unwrap();
+			let build_info: BuildInfo = serde_json::from_slice(&whole_body).unwrap();
 
-			let plan_options = GeneratePlanOptions {
-				path: build_info.path,
-				name: build_info.name,
-				..Default::default()
-			};
+			let plan_options = generate_build_plan(
+					&build_info.path,
+					build_info.envs.iter().map(AsRef::as_ref).collect(),
+					..Default::default()
+			)?;
 
-			let result = create_docker_image(&build_info.path, build_info.envs.iter().map(AsRef::as_ref).collect(), &plan_options, &build_info.build_options).await;
+			let nixpack_options = convert_to_nixpacks_options(&build_info.build_options);
 
+			let result = create_docker_image(
+				&build_info.path,
+				build_info.envs.iter().map(AsRef::as_ref).collect(),
+				&plan_options,
+				&nixpack_options,
+			).await;
 			match result {
 				Ok(_) => Ok(Response::new(Body::from("Image created."))),
 				Err(e) => {
@@ -49,6 +91,7 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> impl Future<It
 	}
 }
 
+#[tokio::main]
 async fn main() {
 	dotenv().unwrap();
 	
