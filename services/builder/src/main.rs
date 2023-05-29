@@ -9,6 +9,7 @@ use nixpacks::{create_docker_image, generate_build_plan};
 
 use serde::Deserialize;
 use dotenv::dotenv;
+use futures::future::ok;
 use std::sync::{Arc, Mutex};
 
 type SharedChild = Arc<Mutex<Option<BuildPlan>>>;
@@ -63,12 +64,30 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 	match (req.method(), req.uri().path()) {
 		(&Method::POST, "/build") => {
 			let whole_body = to_bytes(req.into_body()).await?;
-			let build_info: BuildInfo = serde_json::from_slice(&whole_body).unwrap();
+			let build_info: BuildInfo = match serde_json::from_slice(&whole_body) {
+				Ok(info) => info,
+				Err(_) => {
+				let response = Response::builder()
+					.status(StatusCode::BAD_REQUEST)
+					.body(Body::from("Invalid request body"))
+					.unwrap();
+				return Ok(response);
+				}
+			};
 
-			let plan_options = generate_build_plan(
-					&build_info.path,
-					build_info.envs.iter().map(AsRef::as_ref).collect(),
-					&Default::default()
+			if build_info.path.is_empty() || build_info.name.is_empty() {
+				let response = Response::builder()
+					.status(StatusCode::BAD_REQUEST)
+					.body(Body::from("Missing required fields"))
+					.unwrap();
+				return Ok(response)
+			}
+			let plan_options = GeneratePlanOptions::default(); // Generate default options
+
+			let plan = generate_build_plan(
+				&build_info.path,
+				build_info.envs.iter().map(AsRef::as_ref).collect(),
+				&plan_options
 			);
 
 			let nixpack_options = convert_to_nixpacks_options(&build_info.build_options);
@@ -81,12 +100,17 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 			).await;
 			match result {
 				Ok(_) => Ok(Response::new(Body::from("Image created."))),
-				Err(e) => {
+				Err(e) => Err({
 					let mut response = Response::new(Body::from(format!("Failed to create image: {}", e)));
 					*response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-					Ok(response)
-				}
-			}
+					Err(hyper::Error::from(response).into())
+				})
+			};
+
+			Ok(Response::new(Body::from("Image created.")))
+		}
+		_ => {
+			Ok(Response::builder().status(StatusCode::METHOD_NOT_ALLOWED).body(Body::from("Method not allowed")).unwrap())
 		}
 	}
 }
@@ -97,12 +121,12 @@ async fn main() {
 	
 	let child_handle = Arc::new(Mutex::new(None));
 
-	let service = make_service_fn(future::ok(move |_| {
+	let service = make_service_fn(move |_| {
 		let child_handle = child_handle.clone();
 		async move {
 			Ok::<_, hyper::Error>(service_fn(move |req| handle(req, child_handle.clone())))
 		}
-	}));
+	});
 
 	let addr = ([127, 0, 0, 1], 8084).into();
 	let server = Server::bind(&addr).serve(service);
