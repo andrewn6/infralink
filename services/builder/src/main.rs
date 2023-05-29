@@ -68,8 +68,8 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 			let plan_options = generate_build_plan(
 					&build_info.path,
 					build_info.envs.iter().map(AsRef::as_ref).collect(),
-					..Default::default()
-			)?;
+					&Default::default()
+			);
 
 			let nixpack_options = convert_to_nixpacks_options(&build_info.build_options);
 
