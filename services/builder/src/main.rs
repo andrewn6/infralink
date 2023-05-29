@@ -10,7 +10,6 @@ use nixpacks::{create_docker_image, generate_build_plan};
 
 use serde::Deserialize;
 use dotenv::dotenv;
-use futures::future::ok;
 use std::sync::{Arc, Mutex};
 
 type SharedChild = Arc<Mutex<Option<BuildPlan>>>;
