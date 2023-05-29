@@ -1,6 +1,7 @@
 use hyper::body::to_bytes;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server, StatusCode, Method, Error};
+use hyper::{Body, Request, Response, StatusCode, Method, Error};
+use hyper::Server;
 
 use nixpacks::nixpacks::builder::docker::DockerBuilderOptions as NixpacksOptions;
 use nixpacks::nixpacks::plan::generator::GeneratePlanOptions;
@@ -98,12 +99,12 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 				&plan_options,
 				&nixpack_options,
 			).await;
-			match result {
+			let _ = match result {
 				Ok(_) => Ok(Response::new(Body::from("Image created."))),
 				Err(e) => Err({
 					let mut response = Response::new(Body::from(format!("Failed to create image: {}", e)));
 					*response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-					Err(hyper::Error::from(response).into())
+					response
 				})
 			};
 
