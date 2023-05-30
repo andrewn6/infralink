@@ -12,5 +12,5 @@ dotenv = "0.15.0"
 colored = "2.0.0"
 chrono = "0.4.24"
 futures = "0.3.28"
-tokio = { version = "1.28.1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.28.1", features = ["rt-multi-thread", "macros", "time"] }
 indexmap = "1.9.3"

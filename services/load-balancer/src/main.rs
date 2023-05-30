@@ -15,17 +15,10 @@ async fn main() {
 	let routing_table = utils::build_routing_table(ping_map.clone());
 	let shared_state = Arc::new(Mutex::new((ping_map, routing_table)));
 
+	// You don't need to clone shared_state anymore.
 	let shared_state_clone = Arc::clone(&shared_state);
-
 	tokio::spawn(async move {
-		let shared_state_clone = Arc::clone(&shared_state_clone);
-
-		let mut state = {
-			let state_guard = shared_state_clone.lock().await;
-			state_guard.clone()
-		};
-
-		db::subscribe_to_changes(&mut state).await.unwrap();
+		db::subscribe_to_changes(shared_state_clone).await.unwrap();
 	});
 
 	loop {

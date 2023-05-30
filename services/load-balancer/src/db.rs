@@ -1,10 +1,11 @@
-use std::collections::HashMap;
-
 use dotenv_codegen::dotenv;
 use futures::stream::StreamExt;
 use indexmap::IndexMap;
 use redis::aio::Connection;
 use redis::{AsyncCommands, RedisResult};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::utils;
 
@@ -22,15 +23,17 @@ pub async fn get_ping_map(connection: &mut Connection) -> RedisResult<HashMap<St
 	let keys: Vec<String> = connection.hkeys("ping").await?;
 
 	for key in keys {
-		let value: String = connection.hget("ping", &key).await?;
-		result.insert(key, value);
+		let value: Option<String> = connection.hget("ping", &key).await?;
+		if let Some(v) = value {
+			result.insert(key, v);
+		}
 	}
 
 	Ok(result)
 }
 
 pub async fn subscribe_to_changes(
-	state: &mut (HashMap<String, String>, IndexMap<String, String>),
+	shared_state: Arc<Mutex<(HashMap<String, String>, IndexMap<String, String>)>>,
 ) -> RedisResult<()> {
 	let pubsub_connection = connection().await?; // Create a new connection for pubsub.
 
@@ -44,17 +47,16 @@ pub async fn subscribe_to_changes(
 	loop {
 		let msg = pubsub.on_message().next().await;
 		match msg {
-			Some(msg) => {
-				let payload: String = msg.get_payload()?;
+			Some(_) => {
 				println!("Changes detected in 'ping'");
 
-				if payload == "set" {
-					// If the key has been set, update the ping_map and routing_table
-					let new_ping_map = get_ping_map(&mut connection).await?;
-					let new_routing_table = utils::build_routing_table(new_ping_map.clone());
+				// Whenever any change is detected, update the ping_map and routing_table
+				let new_ping_map = get_ping_map(&mut connection).await?;
+				let new_routing_table = utils::build_routing_table(new_ping_map.clone());
 
-					*state = (new_ping_map, new_routing_table);
-				}
+				// Replace old state with new state.
+				let mut state = shared_state.lock().await;
+				*state = (new_ping_map, new_routing_table);
 			}
 			None => return Ok(()),
 		}
