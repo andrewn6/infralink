@@ -11,7 +11,11 @@ use nixpacks::{create_docker_image, generate_build_plan};
 pub mod db;
 
 use db::db::connection;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
+use dotenv_codegen::dotenv;
+
+use reqwest::Client;
+use serde_json::json;
 use std::sync::{Arc};
 use chrono::Utc;
 use tokio::sync::Mutex;
@@ -43,16 +47,6 @@ pub struct DockerBuilderOptions {
     pub no_error_without_start: bool,
     pub incremental_cache_image: Option<String>,
     pub verbose: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct BuildData {
-	id: String,
-	status: String,
-	start_time: String,
-	end_time: Option<String>,
-	path: String,
-	name: String,
 }
 
 fn convert_to_nixpacks_options(local_options: &DockerBuilderOptions) -> NixpacksOptions {
@@ -124,7 +118,24 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 			).await;
 
 			let status = match result {
-				Ok(_) => "Completed",
+				Ok(_) => {
+					let client = Client::new();
+					let registry_post_data = json!({
+						"registry_url": dotenv!("DOCKER_REGISTRY_URL"),
+						"image_name": build_info.name,
+						"image_tag": build_info.build_options.tags.get(0).unwrap_or(&"latest".to_string())
+					});
+
+					let push_result = client.post("http://localhost:8083/push")
+						.json(&registry_post_data)
+						.send()
+						.await;
+
+					match push_result {
+						Ok(_) => "Completed",
+						Err(_) => "Failed"
+					}
+				},
 				Err(_) => "Failed"
 			};
 
