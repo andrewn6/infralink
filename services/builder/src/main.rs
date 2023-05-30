@@ -8,8 +8,8 @@ use nixpacks::nixpacks::plan::generator::GeneratePlanOptions;
 use nixpacks::nixpacks::plan::BuildPlan;
 use nixpacks::{create_docker_image, generate_build_plan};
 
-use serde::Deserialize;
-use dotenv::dotenv;
+use redis::{Commands, Connection, RedisResult};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc};
 use tokio::sync::Mutex;
 
@@ -42,6 +42,16 @@ pub struct DockerBuilderOptions {
     pub verbose: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct BuildData {
+	id: String,
+	status: String,
+	start_time: String,
+	end_time: Option<String>,
+	path: String,
+	name: String,
+}
+
 fn convert_to_nixpacks_options(local_options: &DockerBuilderOptions) -> NixpacksOptions {
 	NixpacksOptions {
         name: local_options.name.clone(),
@@ -61,6 +71,7 @@ fn convert_to_nixpacks_options(local_options: &DockerBuilderOptions) -> Nixpacks
         verbose: local_options.verbose,
     }
 }
+
 async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Response<Body>, Error> {
 	match (req.method(), req.uri().path()) {
 		(&Method::POST, "/build") => {
@@ -117,9 +128,7 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 }
 
 #[tokio::main]
-async fn main() {
-	dotenv().unwrap();
-	
+async fn main() {	
 	let child_handle = Arc::new(Mutex::new(None));
 
 	let service = make_service_fn(move |_| {
