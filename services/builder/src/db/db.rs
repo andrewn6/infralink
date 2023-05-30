@@ -1,14 +1,8 @@
 use dotenv_codegen::dotenv;
-use redis::cluster::ClusterClient;
-use redis::cluster_async::ClusterConnection;
-use redis::RedisResult;
+use postgres::{Client, NoTls, Error};
 
-pub async fn connection() -> RedisResult<ClusterConnection> {
-	let nodes = vec![dotenv!("NEW_YORK_REDIS_CONNECTION_URL")];
+pub async fn connection() -> Result<Client, Error> {
+	let client = Client::connect(dotenv!("COCKROACH_DB_URL"), NoTls)?;
 
-	let client = ClusterClient::new(nodes).unwrap();
-
-	let connection = client.get_async_connection().await?;
-
-	Ok(connection)
+	Ok(client)
 }

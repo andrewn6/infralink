@@ -8,9 +8,12 @@ use nixpacks::nixpacks::plan::generator::GeneratePlanOptions;
 use nixpacks::nixpacks::plan::BuildPlan;
 use nixpacks::{create_docker_image, generate_build_plan};
 
-use redis::{Commands, Connection, RedisResult};
+pub mod db;
+
+use db::db::connection;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc};
+use chrono::Utc;
 use tokio::sync::Mutex;
 
 type SharedChild = Arc<Mutex<Option<BuildPlan>>>;
@@ -75,6 +78,8 @@ fn convert_to_nixpacks_options(local_options: &DockerBuilderOptions) -> Nixpacks
 async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Response<Body>, Error> {
 	match (req.method(), req.uri().path()) {
 		(&Method::POST, "/build") => {
+			let mut conn = connection().await.unwrap();
+				
 			let whole_body = to_bytes(req.into_body()).await?;
 			let build_info: BuildInfo = match serde_json::from_slice(&whole_body) {
 				Ok(info) => info,
@@ -104,12 +109,29 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 
 			let nixpack_options = convert_to_nixpacks_options(&build_info.build_options);
 
+			let start_time = Utc::now().to_rfc3339();
+			let build_if = format!("{}:{}", &build_info.path, &start_time);
+
+			/* Insert build data once build is triggered */
+			conn.execute("INSERT into build_data (id, start_time, status) VALUES ($1, $2, $3)",
+				&[&build_if, &start_time, &"running"]).unwrap();
+
 			let result = create_docker_image(
 				&build_info.path,
 				build_info.envs.iter().map(AsRef::as_ref).collect(),
 				&plan_options,
 				&nixpack_options,
 			).await;
+
+			let status = match result {
+				Ok(_) => "Completed",
+				Err(_) => "Failed"
+			};
+
+			let end_time = Utc::now().to_rfc3339();
+			conn.execute("UPDATE build_data SET status = $1, end_time = $2 WHERE id = $3",
+				&[&status, &end_time, &build_if]).unwrap();
+
 			let _ = match result {
 				Ok(_) => Ok(Response::new(Body::from("Image created."))),
 				Err(e) => Err({
@@ -141,7 +163,7 @@ async fn main() {
 	let addr = ([127, 0, 0, 1], 8084).into();
 	let server = Server::bind(&addr).serve(service);
 
-	println!("Server listening on {}", addr);
+	println!("Builder Server listening on {}", addr);
 
 	if let Err(e) = server.await {
 		eprintln!("server error: {}", e);
