@@ -5,7 +5,6 @@ use dotenv::dotenv;
 
 pub mod db;
 pub mod scale;
-pub mod stats;
 
 fn main() {
 	// Load environment variables into runtime

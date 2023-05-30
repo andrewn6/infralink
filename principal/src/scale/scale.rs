@@ -1,29 +1,34 @@
 use std::sync::atomic::{AtomicUsize, Ordering as OtherOrdering};
 
+use std::sync::mpsc::Receiver;
 use std::sync::mpsc::{self};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use dotenv_codegen::dotenv;
 use futures_util::TryStreamExt;
 use lapin::types::FieldTable;
-use reqwest::blocking::Client;
-use dotenv_codegen::dotenv;
 
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use tokio::sync::{Mutex, Notify};
 use futures_util::stream::StreamExt as FuturesStreamExt;
+use serde::{Deserialize, Serialize};
+use tokio::sync::Notify;
 use tracing::{error, info};
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::*;
 
-use lapin::options::{BasicAckOptions, QueueDeclareOptions, BasicConsumeOptions};
-use lapin::{Channel, Connection, ConnectionProperties};
-
+use lapin::options::{
+	BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions,
+};
+use lapin::{BasicProperties, Channel, Connection, ConnectionProperties};
 
 const VULTR_API_KEY: &str = dotenv!("VULTR_API_KEY");
 const VULTR_API_BASE: &str = "https://api.vultr.com/v2/";
+
+use worker::stats::{
+	container_stats_service_client::ContainerStatsServiceClient, ContainerStatsRequest,
+	ContainerStatsResponse,
+};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Metrics {
@@ -45,6 +50,7 @@ pub struct WorkerState {
 	pub workload: f64,
 }
 
+/*
 fn create_vultr_instance(worker_id: usize) -> Result<String, Box<dyn std::error::Error>> {
 	let client = Client::new();
 
@@ -58,8 +64,8 @@ fn create_vultr_instance(worker_id: usize) -> Result<String, Box<dyn std::error:
 		}))
 		.send()?;
 	if response.status().is_success() {
-		let json = response.json()?;
-		let instance_id = json["instance"]["id"].as_str.unwrap().to_string();
+		let json: serde_json::Value = response.json()?;
+		let instance_id = json["instance"]["id"].as_str().unwrap().to_string();
 		info!("Created instance {}", instance_id);
 		Ok(instance_id)
 	} else {
@@ -70,7 +76,9 @@ fn create_vultr_instance(worker_id: usize) -> Result<String, Box<dyn std::error:
 		)))
 	}
 }
+*/
 
+/*
 fn delete_vultr_instance(instance_id: &str) -> Result<String, Box<dyn std::error::Error>> {
 	let client = Client::new();
 
@@ -89,44 +97,69 @@ fn delete_vultr_instance(instance_id: &str) -> Result<String, Box<dyn std::error
 		)))
 	}
 }
-
+*/
 async fn scale_down(
 	num_workers: &AtomicUsize,
 	worker_states: &mut Vec<WorkerState>,
-	conn: &Connection,
 	channel: &Channel,
-	metrics_rx: &Arc<Mutex<mpsc::Receiver<Metrics>>>,
+	metrics_rx: &mpsc::Receiver<Metrics>,
 	workload_threshold: f64,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let mut deleted_ids = Vec::new();
+
+	let metrics = metrics_rx.recv()?;
+
 	for worker in worker_states.iter() {
-		if worker.workload < workload_threshold {
+		if metrics.workload < workload_threshold {
 			match delete_vultr_instance(&format!("{}", worker.id)) {
 				Ok(_) => {
 					info!("Deleted instance {}", worker.id);
 					num_workers.fetch_sub(1, OtherOrdering::SeqCst);
 					deleted_ids.push(worker.id);
-				},
+
+					let _ = channel
+						.basic_publish(
+							"",
+							"worker_deletion",
+							BasicPublishOptions::default(),
+							format!("worker {} deleted", worker.id).as_bytes(),
+							BasicProperties::default(),
+						)
+						.await?;
+				}
 				Err(err) => error!("failed to scale down: {}", err),
 			}
 		}
 	}
-	*worker_states = worker_states.clone().into_iter().filter(|w| !deleted_ids.contains(&w.id)).collect();
+	*worker_states = worker_states
+		.clone()
+		.into_iter()
+		.filter(|w| !deleted_ids.contains(&w.id))
+		.collect();
 	Ok(())
 }
 
 async fn scale_up(
 	id: usize,
-	rx: mpsc::Receiver<Metrics>,
+	rx: &std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Receiver<Metrics>>>,
 	tx: &std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Sender<Metrics>>>,
 	notify: Arc<tokio::sync::Notify>,
-	conn: &Connection,
 	channel: &Channel,
 	num_workers: &mut usize,
 ) -> Result<WorkerState, Box<dyn std::error::Error + Send + Sync>> {
+	let metrics = {
+		let rx = rx.lock().unwrap();
+		rx.recv()?
+	};
+
+	info!("received metrics: {:?}", metrics);
+
 	match create_vultr_instance(*num_workers) {
 		Ok(instance_id) => {
-			info!("Sucessfully scaled up by creating a new instance with ID: {}", instance_id);
+			info!(
+				"Sucessfully scaled up by creating a new instance with ID: {}",
+				instance_id
+			);
 			*num_workers += 1;
 
 			let worker_state = WorkerState {
@@ -136,8 +169,22 @@ async fn scale_up(
 				worker_id: id,
 				workload: 0.0,
 			};
+
+			let message = format!("Created instance with ID: {}", instance_id);
+			let _ = channel
+				.basic_publish(
+					"",
+					"instance_creation",
+					BasicPublishOptions::default(),
+					message.as_bytes(),
+					BasicProperties::default(),
+				)
+				.await?;
+			let tx_guard = tx.lock().unwrap();
+			tx_guard.send(metrics)?;
+
 			Ok(worker_state)
-		},
+		}
 		Err(err) => {
 			error!("Failed to scale up: {}", err);
 			Err(Box::new(std::io::Error::new(
@@ -182,64 +229,73 @@ pub async fn main() {
 		)
 		.await
 		.unwrap();
-	
-	let mut workload_threshold = 0.0;
-	let mut scaling_factor = 2;
+
+	let workload_threshold = 0.0;
+	let scaling_factor = 2;
 
 	loop {
-		let guard = metrics_rx.lock().await;
-		let metrics = *guard;
-		if num_workers.load(OtherOrdering::SeqCst) < metrics * scaling_factor {
+		let metrics = metrics_rx
+			.lock()
+			.expect("Failed to acquire lock")
+			.recv()
+			.expect("Failed to receive metrics");
+
+		if num_workers.load(OtherOrdering::SeqCst)
+			< (metrics.workload * scaling_factor as f64).round() as usize
+		{
+			let mut num_workers_val = num_workers.load(OtherOrdering::SeqCst);
+			let rx = Arc::new(Mutex::new(rx));
 			if let Ok(worker_state) = scale_up(
-				num_workers.load(OtherOrdering::SeqCst),
-				metrics_rx.lock(),
-				&tx,
+				num_workers_val,
+				&rx,
+				&Arc::clone(&tx),
 				notify.clone(),
-				&conn,
 				&channel,
-				&mut num_workers,
+				&mut num_workers_val,
 			)
 			.await
 			{
 				worker_states.push(worker_state);
 
 				let consumer_tag = format!("consumer_{}", worker_state.id);
-				let consumer = channel.basic_consume(
-					queue.name().as_str(),
-					&consumer_tag,
-					BasicConsumeOptions::default(),
-					FieldTable::default(),
-				)
-				.await
-				.unwrap();
+				let consumer = channel
+					.basic_consume(
+						queue.name().as_str(),
+						&consumer_tag,
+						BasicConsumeOptions::default(),
+						FieldTable::default(),
+					)
+					.await
+					.unwrap();
 
 				tokio::spawn(async move {
-					// Convert to a stream 
+					// Convert to a stream
 					let mut consumer_stream = consumer.into_stream();
 
-					while let Some(result) = consumer.next().await {
+					while let Some(result) = consumer_stream.next().await {
 						match result {
 							Ok(delivery) => {
 								delivery
 									.ack(BasicAckOptions::default())
 									.await
 									.expect("ack error");
-		
+
 								let data: Metrics = serde_json::from_slice(&delivery.data).unwrap();
 								println!("{:?}", data);
 							}
-							Err(_) => eprintln!("Consumer error: {:?}", result)
+							Err(_) => eprintln!("Consumer error: {:?}", result),
 						}
 					}
 				});
 			}
-		} else if num_workers.load(OtherOrdering::SeqCst) > metrics_rx.lock().unwrap().len() * scaling_factor {
+		} else if num_workers.load(OtherOrdering::SeqCst)
+			> (metrics.workload * scaling_factor as f64).round() as usize
+		{
 			if let Ok(_) = scale_down(
 				&num_workers,
 				&mut worker_states,
-				&conn,
 				&channel,
-				&metrics_rx,
+				&rx,
 				workload_threshold,
 			)
 			.await

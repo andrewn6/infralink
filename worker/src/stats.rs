@@ -1,31 +1,31 @@
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MemoryMetadata {
-	#[prost(message, optional, tag = "1")]
-	pub primary: ::core::option::Option<Memory>,
-	#[prost(message, optional, tag = "2")]
-	pub swap: ::core::option::Option<Memory>,
+pub struct ContainerStatsRequest {
+	#[prost(string, tag = "1")]
+	pub container_id: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Memory {
-	#[prost(uint64, tag = "1")]
-	pub total: u64,
-	#[prost(uint64, tag = "2")]
-	pub used: u64,
-	#[prost(uint64, tag = "3")]
-	pub free: u64,
+pub struct ContainerStatsResponse {
+	#[prost(double, tag = "1")]
+	pub cpu_usage: f64,
+	#[prost(double, tag = "2")]
+	pub memory_usage: f64,
+	#[prost(double, tag = "3")]
+	pub network_io: f64,
+	#[prost(double, tag = "4")]
+	pub block_io: f64,
 }
 /// Generated client implementations.
-pub mod memory_service_client {
+pub mod container_stats_service_client {
 	#![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
 	use tonic::codegen::http::Uri;
 	use tonic::codegen::*;
 	#[derive(Debug, Clone)]
-	pub struct MemoryServiceClient<T> {
+	pub struct ContainerStatsServiceClient<T> {
 		inner: tonic::client::Grpc<T>,
 	}
-	impl MemoryServiceClient<tonic::transport::Channel> {
+	impl ContainerStatsServiceClient<tonic::transport::Channel> {
 		/// Attempt to create a new client by connecting to a given endpoint.
 		pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
 		where
@@ -36,7 +36,7 @@ pub mod memory_service_client {
 			Ok(Self::new(conn))
 		}
 	}
-	impl<T> MemoryServiceClient<T>
+	impl<T> ContainerStatsServiceClient<T>
 	where
 		T: tonic::client::GrpcService<tonic::body::BoxBody>,
 		T::Error: Into<StdError>,
@@ -54,7 +54,7 @@ pub mod memory_service_client {
 		pub fn with_interceptor<F>(
 			inner: T,
 			interceptor: F,
-		) -> MemoryServiceClient<InterceptedService<T, F>>
+		) -> ContainerStatsServiceClient<InterceptedService<T, F>>
 		where
 			F: tonic::service::Interceptor,
 			T::ResponseBody: Default,
@@ -67,7 +67,7 @@ pub mod memory_service_client {
 			<T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
 				Into<StdError> + Send + Sync,
 		{
-			MemoryServiceClient::new(InterceptedService::new(inner, interceptor))
+			ContainerStatsServiceClient::new(InterceptedService::new(inner, interceptor))
 		}
 		/// Compress requests with the given encoding.
 		///
@@ -84,10 +84,10 @@ pub mod memory_service_client {
 			self.inner = self.inner.accept_compressed(encoding);
 			self
 		}
-		pub async fn get_memory_metadata(
+		pub async fn get_container_stats(
 			&mut self,
-			request: impl tonic::IntoRequest<()>,
-		) -> Result<tonic::Response<super::MemoryMetadata>, tonic::Status> {
+			request: impl tonic::IntoRequest<super::ContainerStatsRequest>,
+		) -> Result<tonic::Response<super::ContainerStatsResponse>, tonic::Status> {
 			self.inner.ready().await.map_err(|e| {
 				tonic::Status::new(
 					tonic::Code::Unknown,
@@ -95,32 +95,33 @@ pub mod memory_service_client {
 				)
 			})?;
 			let codec = tonic::codec::ProstCodec::default();
-			let path =
-				http::uri::PathAndQuery::from_static("/memory.MemoryService/GetMemoryMetadata");
+			let path = http::uri::PathAndQuery::from_static(
+				"/stats.ContainerStatsService/GetContainerStats",
+			);
 			self.inner.unary(request.into_request(), path, codec).await
 		}
 	}
 }
 /// Generated server implementations.
-pub mod memory_service_server {
+pub mod container_stats_service_server {
 	#![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
 	use tonic::codegen::*;
-	/// Generated trait containing gRPC methods that should be implemented for use with MemoryServiceServer.
+	/// Generated trait containing gRPC methods that should be implemented for use with ContainerStatsServiceServer.
 	#[async_trait]
-	pub trait MemoryService: Send + Sync + 'static {
-		async fn get_memory_metadata(
+	pub trait ContainerStatsService: Send + Sync + 'static {
+		async fn get_container_stats(
 			&self,
-			request: tonic::Request<()>,
-		) -> Result<tonic::Response<super::MemoryMetadata>, tonic::Status>;
+			request: tonic::Request<super::ContainerStatsRequest>,
+		) -> Result<tonic::Response<super::ContainerStatsResponse>, tonic::Status>;
 	}
 	#[derive(Debug)]
-	pub struct MemoryServiceServer<T: MemoryService> {
+	pub struct ContainerStatsServiceServer<T: ContainerStatsService> {
 		inner: _Inner<T>,
 		accept_compression_encodings: EnabledCompressionEncodings,
 		send_compression_encodings: EnabledCompressionEncodings,
 	}
 	struct _Inner<T>(Arc<T>);
-	impl<T: MemoryService> MemoryServiceServer<T> {
+	impl<T: ContainerStatsService> ContainerStatsServiceServer<T> {
 		pub fn new(inner: T) -> Self {
 			Self::from_arc(Arc::new(inner))
 		}
@@ -151,9 +152,9 @@ pub mod memory_service_server {
 			self
 		}
 	}
-	impl<T, B> tonic::codegen::Service<http::Request<B>> for MemoryServiceServer<T>
+	impl<T, B> tonic::codegen::Service<http::Request<B>> for ContainerStatsServiceServer<T>
 	where
-		T: MemoryService,
+		T: ContainerStatsService,
 		B: Body + Send + 'static,
 		B::Error: Into<StdError> + Send + 'static,
 	{
@@ -166,15 +167,20 @@ pub mod memory_service_server {
 		fn call(&mut self, req: http::Request<B>) -> Self::Future {
 			let inner = self.inner.clone();
 			match req.uri().path() {
-				"/memory.MemoryService/GetMemoryMetadata" => {
+				"/stats.ContainerStatsService/GetContainerStats" => {
 					#[allow(non_camel_case_types)]
-					struct GetMemoryMetadataSvc<T: MemoryService>(pub Arc<T>);
-					impl<T: MemoryService> tonic::server::UnaryService<()> for GetMemoryMetadataSvc<T> {
-						type Response = super::MemoryMetadata;
+					struct GetContainerStatsSvc<T: ContainerStatsService>(pub Arc<T>);
+					impl<T: ContainerStatsService>
+						tonic::server::UnaryService<super::ContainerStatsRequest> for GetContainerStatsSvc<T>
+					{
+						type Response = super::ContainerStatsResponse;
 						type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-						fn call(&mut self, request: tonic::Request<()>) -> Self::Future {
+						fn call(
+							&mut self,
+							request: tonic::Request<super::ContainerStatsRequest>,
+						) -> Self::Future {
 							let inner = self.0.clone();
-							let fut = async move { (*inner).get_memory_metadata(request).await };
+							let fut = async move { (*inner).get_container_stats(request).await };
 							Box::pin(fut)
 						}
 					}
@@ -183,7 +189,7 @@ pub mod memory_service_server {
 					let inner = self.inner.clone();
 					let fut = async move {
 						let inner = inner.0;
-						let method = GetMemoryMetadataSvc(inner);
+						let method = GetContainerStatsSvc(inner);
 						let codec = tonic::codec::ProstCodec::default();
 						let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
 							accept_compression_encodings,
@@ -205,7 +211,7 @@ pub mod memory_service_server {
 			}
 		}
 	}
-	impl<T: MemoryService> Clone for MemoryServiceServer<T> {
+	impl<T: ContainerStatsService> Clone for ContainerStatsServiceServer<T> {
 		fn clone(&self) -> Self {
 			let inner = self.inner.clone();
 			Self {
@@ -215,7 +221,7 @@ pub mod memory_service_server {
 			}
 		}
 	}
-	impl<T: MemoryService> Clone for _Inner<T> {
+	impl<T: ContainerStatsService> Clone for _Inner<T> {
 		fn clone(&self) -> Self {
 			Self(self.0.clone())
 		}
@@ -225,7 +231,7 @@ pub mod memory_service_server {
 			write!(f, "{:?}", self.0)
 		}
 	}
-	impl<T: MemoryService> tonic::server::NamedService for MemoryServiceServer<T> {
-		const NAME: &'static str = "memory.MemoryService";
+	impl<T: ContainerStatsService> tonic::server::NamedService for ContainerStatsServiceServer<T> {
+		const NAME: &'static str = "stats.ContainerStatsService";
 	}
 }

@@ -8,7 +8,13 @@ use hello_world::{HelloReply, HelloRequest};
 pub mod container;
 
 use container::logic::MyDockerService;
+use container::stats::MyContainerStatsService;
 use docker::docker_service_server::DockerServiceServer;
+use stats::container_stats_service_server::ContainerStatsServiceServer;
+
+pub mod stats {
+	include!("stats.rs");
+}
 
 pub mod docker {
 	include!("docker.rs");
@@ -74,7 +80,8 @@ impl Greeter for MyGreeter {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let addr = "[::1]:50051".parse().unwrap();
 	let greeter = MyGreeter::default();
-	let docker_service = MyDockerService::default();
+	//let docker_service = MyDockerService::default();
+	let container_stats_service = MyContainerStatsService {};
 
 	let reflection_service = tonic_reflection::server::Builder::configure()
 		.register_encoded_file_descriptor_set(proto_memory::FILE_DESCRIPTOR_SET)
@@ -86,7 +93,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	Server::builder()
 		.add_service(GreeterServer::new(greeter))
 		.add_service(reflection_service)
-		.add_service(DockerServiceServer::new(docker_service))
+		//.add_service(DockerServiceServer::new(docker_service))
+		.add_service(ContainerStatsServiceServer::new(container_stats_service))
 		.serve(addr)
 		.await?;
 

@@ -1,3 +1,3 @@
 pub mod hetzner;
-pub mod vultr;
 pub mod hosthatch;
+pub mod vultr;
