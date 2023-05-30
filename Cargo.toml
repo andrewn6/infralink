@@ -6,7 +6,8 @@ members = [
   "services/health-check",  # Codebase for health check
   "services/load-balancer", # Load balancer
   "services/ping-server", # Ping server
-  "services/registry" # Docker registry service
+  "services/registry", # Docker registry service
+  "services/builder" # Builder
 ]
 
 [profile.release]
