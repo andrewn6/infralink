@@ -14,7 +14,7 @@ use db::db::connection;
 use serde::{Deserialize};
 use dotenv_codegen::dotenv;
 
-use reqwest::Client as ReqwestClient;
+use reqwest::Client;
 use serde_json::json;
 use std::sync::{Arc};
 use chrono::Utc;
@@ -72,7 +72,16 @@ fn convert_to_nixpacks_options(local_options: &DockerBuilderOptions) -> Nixpacks
 async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Response<Body>, Error> {
 	match (req.method(), req.uri().path()) {
 		(&Method::POST, "/build") => {
-			let mut conn = connection().await.unwrap();
+			let mut conn = match connection().await {
+				Ok(conn) => conn,
+				Err(e) => {
+					eprintln!("Connection error: {}", e);
+					return Ok(Response::builder()
+						.status(StatusCode::INTERNAL_SERVER_ERROR)
+						.body(Body::from("Internal Server Error"))
+						.unwrap());
+				}
+			};
 				
 			let whole_body = to_bytes(req.into_body()).await?;
 			let build_info: BuildInfo = match serde_json::from_slice(&whole_body) {
@@ -108,7 +117,7 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 
 			/* Insert build data once build is triggered */
 			conn.execute("INSERT into build_data (id, start_time, status) VALUES ($1, $2, $3)",
-				&[&build_if, &start_time, &"running"]).unwrap();
+				&[&build_if, &start_time, &"running"]).await.unwrap();
 
 			let result = create_docker_image(
 				&build_info.path,
@@ -119,7 +128,7 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 
 			let status = match result {
 				Ok(_) => {
-					let client = ReqwestClient::new();
+					let client = Client::new();
 					let registry_post_data = json!({
 						"registry_url": dotenv!("DOCKER_REGISTRY_URL"),
 						"image_name": build_info.name,
@@ -141,7 +150,7 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 
 			let end_time = Utc::now().to_rfc3339();
 			conn.execute("UPDATE build_data SET status = $1, end_time = $2 WHERE id = $3",
-				&[&status, &end_time, &build_if]).unwrap();
+				&[&status, &end_time, &build_if]).await.unwrap();
 
 			let _ = match result {
 				Ok(_) => Ok(Response::new(Body::from("Image created."))),

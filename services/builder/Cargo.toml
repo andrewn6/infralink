@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json"] } 
 hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features=["full"] }
 models = { path = "../../models" }
@@ -19,5 +19,5 @@ prometheus = "0.13.3"
 nixpacks = "1.9.0"
 futures = "0.3.28"
 dotenv_codegen = "0.15.0"
-postgres = "0.19.5"
+tokio-postgres = "0.7.8"
 shiplift = "0.7.0"
