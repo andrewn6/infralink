@@ -14,7 +14,7 @@ use db::db::connection;
 use serde::{Deserialize};
 use dotenv_codegen::dotenv;
 
-use reqwest::Client;
+use reqwest::Client as ReqwestClient;
 use serde_json::json;
 use std::sync::{Arc};
 use chrono::Utc;
@@ -119,7 +119,7 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 
 			let status = match result {
 				Ok(_) => {
-					let client = Client::new();
+					let client = ReqwestClient::new();
 					let registry_post_data = json!({
 						"registry_url": dotenv!("DOCKER_REGISTRY_URL"),
 						"image_name": build_info.name,
