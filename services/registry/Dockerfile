@@ -1,17 +1,13 @@
-FROM rust:latest as builder
+FROM rust:latest
 
-WORKDIR /usr/src/registry 
+WORKDIR /usr/src/registry
 
-COPY . .
+COPY Cargo.toml ./
 
 RUN cargo build --release
 
-FROM debian:bullseye-slim
-
-WORKDIR /runner
-
-COPY --from=builder /usr/src/registry/target/release/registry registry
+COPY src ./src
 
 EXPOSE 8083
 
-RUN ["cargo", "run"]
+CMD ["cargo", "run", "release"]

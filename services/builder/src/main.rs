@@ -72,7 +72,7 @@ fn convert_to_nixpacks_options(local_options: &DockerBuilderOptions) -> Nixpacks
 async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Response<Body>, Error> {
 	match (req.method(), req.uri().path()) {
 		(&Method::POST, "/build") => {
-			let mut conn = match connection().await {
+			let conn = match connection().await {
 				Ok(conn) => conn,
 				Err(e) => {
 					eprintln!("Connection error: {}", e);

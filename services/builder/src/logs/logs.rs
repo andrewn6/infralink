@@ -10,5 +10,5 @@ async fn get_logs(container_id: &str) -> Result<(), Box<dyn::std::Error>> {
         .stderr(true)
         .timestamps(true)
         .follow(true)
-        .build();    
+        .build();  
 }
