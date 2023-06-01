@@ -13,9 +13,10 @@ pub mod db;
 use db::db::connection;
 use serde::{Deserialize};
 use dotenv_codegen::dotenv;
+use serde_json::json;
 
 use reqwest::Client;
-use serde_json::json;
+use colored::*;
 use std::sync::{Arc};
 use chrono::Utc;
 use tokio::sync::Mutex;
@@ -183,7 +184,7 @@ async fn main() {
 	let addr = ([127, 0, 0, 1], 8084).into();
 	let server = Server::bind(&addr).serve(service);
 
-	println!("Builder Server listening on {}", addr);
+	println!("Builder Server listening on {}", addr.to_string().bright_blue());
 
 	if let Err(e) = server.await {
 		eprintln!("server error: {}", e);

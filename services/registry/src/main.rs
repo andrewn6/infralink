@@ -9,8 +9,7 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::process::Command;
 
-use std::time::Duration;
-use tokio::time::interval;
+use colored::*;
 
 #[derive(Deserialize)]
 struct ImageData {
@@ -154,7 +153,7 @@ async fn main() {
 
 	let server = Server::bind(&addr).serve(make_svc);
 
-	println!("Registry Server listening on {}", addr);
+	println!("Registry Server listening on {}", addr.to_string().bright_blue());
 
 	if let Err(e) = server.await {
 		eprintln!("server error: {}", e);
