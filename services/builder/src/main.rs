@@ -9,6 +9,7 @@ use nixpacks::nixpacks::plan::BuildPlan;
 use nixpacks::{create_docker_image, generate_build_plan};
 
 pub mod db;
+pub mod logs;
 
 use db::db::connection;
 use serde::{Deserialize};
