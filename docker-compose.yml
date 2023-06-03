@@ -15,7 +15,7 @@ services:
       - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
       - ./rabbitmq/rabbitmq.config:/etc/rabbitmq/rabbitmq.config
     networks:
-      - rabbitmq_go_net
+      - infralink
 
   prometheus:
     image: prom/prometheus
@@ -29,11 +29,29 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
     networks:
-      - rabbitmq_go_net
-
+      - infralink
+  
+  zookeeper:
+    image: zookeeper:latest
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+      - infralink
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    networks:
+      - infralink
+  
 volumes:
   prometheus-data:
 
 networks:
-  rabbitmq_go_net:
+  infralink:
     driver: bridge
