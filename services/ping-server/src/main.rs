@@ -1,5 +1,6 @@
 use colored::Colorize;
 use dotenv_codegen::dotenv;
+use redis::AsyncCommands;
 use std::convert::TryInto;
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -7,6 +8,8 @@ use std::sync::Arc;
 use surge_ping::ping;
 use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
+
+use crate::db::set_airport_ip;
 
 pub mod db;
 
@@ -28,6 +31,10 @@ async fn main() {
 	let origin_region = dotenv!("REGION");
 
 	let mut connection = db::connection().await.unwrap();
+
+	set_airport_ip(&mut connection, "ord", "108.61.202.18")
+		.await
+		.unwrap();
 
 	let ping_map = db::get_airport_ips(&mut connection).await.unwrap();
 

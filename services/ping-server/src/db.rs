@@ -47,25 +47,9 @@ pub async fn store_ping(
 ) -> RedisResult<()> {
 	let mut connection = connection().await?;
 
-	connection
-		.hset(
-			"ping",
-			format!("{}:{}", origin_region, destination_region),
-			rtt,
-		)
-		.await?;
+    let key = format!("ping:{}", origin_region);
 
-	// Store the timestamp of the last ping
-	connection
-		.hset(
-			"ping",
-			format!(
-				"{}:{}:{}",
-				origin_region, destination_region, "last_updated"
-			),
-			chrono::Utc::now().timestamp(),
-		)
-		.await?;
+    let _: () = connection.zadd(&key, destination_region, rtt as f64).await?;
 
 	Ok(())
 }
