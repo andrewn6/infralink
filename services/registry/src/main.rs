@@ -1,16 +1,17 @@
-use futures_util::StreamExt;
 use hyper::body::to_bytes;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use governor::{Quota, RateLimiter};
+
 use serde::Deserialize;
 use shiplift::{Docker, PullOptions};
+use futures_util::StreamExt;
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::process::Command;
-
-use std::time::Duration;
-use tokio::time::interval;
+use std::num::NonZeroU32;
+use colored::*;
 
 #[derive(Deserialize)]
 struct ImageData {
@@ -23,6 +24,16 @@ async fn handle_push(
 	mut req: Request<Body>,
 	docker: Docker,
 ) -> Result<Response<Body>, hyper::Error> {
+
+	let limiter = RateLimiter::direct(Quota::per_second(NonZeroU32::new(1).unwrap()));
+
+	if limiter.check().is_err() {
+		return Ok(Response::builder()
+			.status(StatusCode::TOO_MANY_REQUESTS)
+			.body(Body::from("Too many requests, you are being rate limited."))
+			.unwrap());
+	}
+
 	let whole_body = to_bytes(req.body_mut()).await?;
 
 	let image_data: Result<ImageData, _> = serde_json::from_slice(&whole_body);
@@ -37,6 +48,14 @@ async fn handle_push(
 				.unwrap());
 		}
 	};
+
+	/* Input validation */
+	if image_data.image_name.is_empty() || image_data.image_tag.is_empty() {
+		return Ok(Response::builder()
+			.status(StatusCode::BAD_REQUEST)
+			.body(Body::from("Image name or tag is empty"))
+			.unwrap());
+	}	
 
 	if image_data.image_name.is_empty() || image_data.image_tag.is_empty() {
 		return Ok(Response::builder()
@@ -153,6 +172,8 @@ async fn main() {
 	});
 
 	let server = Server::bind(&addr).serve(make_svc);
+
+	println!("Registry Server listening on {}", addr.to_string().bright_blue());
 
 	if let Err(e) = server.await {
 		eprintln!("server error: {}", e);
