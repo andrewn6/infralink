@@ -2,6 +2,10 @@ use shiplift::Docker;
 use shiplift::LogsOptions;
 use tokio::sync::broadcast;
 
+use clickhouse_rs::{Block, Pool, types::Decimal};
+use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::config::ClientConfig;
+
 use chrono::prelude::*;
 use futures::StreamExt;
 use tracing::{error};
@@ -31,6 +35,15 @@ pub async fn get_logs(container_id: &str, filter: LogFilter, tx: broadcast::Send
     let options = LogsOptions::builder().stdout(true).stderr(true).build();
     let mut logs_stream = container.logs(&options);
 
+    let pool: Pool:new()
+
+    let producer: FutureProducer = ClientConfig::new()
+        .set("bootstrap.servers", "redpanda:18081")
+        .set("message.timeout.ms", "5000")
+        .create()?;
+
+    let pool = Pool::new("tcp://clickhouse:9000");
+
     while let Some(log_result) = logs_stream.next().await {
         match log_result {
             Ok(log_output) => {
@@ -44,8 +57,19 @@ pub async fn get_logs(container_id: &str, filter: LogFilter, tx: broadcast::Send
                     text,
                 };
                 if filter.matches(&message) {
-                    tx.send(message);
+                    let topic = "logs_topic";
+                    let record = FutureRecord::to(topic).payload(&format!("{:?}", message)).key("");
+
+                    producer.send(record, 0).await?;
                 }
+
+                let mut block = Block::new();
+                block.push(("source", message.source));
+                block.push(("timestamp", message.timestamp));
+                block.push(("text", message.text));
+
+                let mut client = pool.get_handle();
+                client.insert("INSERT INTO logs (source, timestamp, text) VALUES", block).await?;
             },
             Err(e) => {
                 error!("Error reading logs: {}", e);

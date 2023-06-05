@@ -1,0 +1,1 @@
+podman-compose exec clickhouse clickhouse-client
