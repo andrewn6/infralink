@@ -2,15 +2,22 @@ use shiplift::Docker;
 use shiplift::LogsOptions;
 use tokio::sync::broadcast;
 
-use clickhouse_rs::{Block, Pool, types::Decimal};
+use clickhouse_rs::Pool;
+use clickhouse_rs::types::{Block, Decimal, Value};
+
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::config::ClientConfig;
+use rdkafka::util::Timeout;
 
 use chrono::prelude::*;
 use futures::StreamExt;
 use tracing::{error};
-use std::str;
 
+use std::sync::Arc;
+use std::str;
+use std::time::Duration;
+
+#[derive(Debug)]
 pub struct LogMessage {
     pub source: String,
     pub timestamp: DateTime<Utc>,
@@ -35,11 +42,13 @@ pub async fn get_logs(container_id: &str, filter: LogFilter, tx: broadcast::Send
     let options = LogsOptions::builder().stdout(true).stderr(true).build();
     let mut logs_stream = container.logs(&options);
 
-    let pool: Pool:new()
+    let pool = Pool::new("tcp://clickhouse:9000");
+
+    let duration_in_millis = Duration::from_secs(5).as_millis().to_string();
 
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", "redpanda:18081")
-        .set("message.timeout.ms", "5000")
+        .set("message.timeout.ms", &duration_in_millis)
         .create()?;
 
     let pool = Pool::new("tcp://clickhouse:9000");
@@ -60,16 +69,26 @@ pub async fn get_logs(container_id: &str, filter: LogFilter, tx: broadcast::Send
                     let topic = "logs_topic";
                     let record = FutureRecord::to(topic).payload(&format!("{:?}", message)).key("");
 
-                    producer.send(record, 0).await?;
+                    producer.send(record, Timeout::Never).await;
                 }
 
                 let mut block = Block::new();
-                block.push(("source", message.source));
-                block.push(("timestamp", message.timestamp));
-                block.push(("text", message.text));
+
+                let row = vec![
+                    ("source".to_string(), Value::String(Arc::new(message.source.into_bytes()))),
+                    ("timestamp".to_string(), Value::DateTime(message.timestamp.timestamp() as u32, Utc)),
+                    ("text".to_string(), Value::String(Arc::new(message.text.into_bytes()))),
+                ];
+                
+                block.push(row);
 
                 let mut client = pool.get_handle();
-                client.insert("INSERT INTO logs (source, timestamp, text) VALUES", block).await?;
+                
+                let row_count = client
+                    .insert("INSERT INTO logs (source, timestamp, text) VALUES")
+                    .bind(block)
+                    .execute()
+                    .await?;
             },
             Err(e) => {
                 error!("Error reading logs: {}", e);

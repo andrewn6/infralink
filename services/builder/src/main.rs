@@ -11,6 +11,7 @@ use nixpacks::{create_docker_image, generate_build_plan};
 pub mod db;
 pub mod logs;
 
+use logs::logs::get_logs;
 use db::db::connection;
 use serde::{Deserialize};
 use dotenv_codegen::dotenv;
@@ -164,7 +165,8 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 			};
 
 			Ok(Response::new(Body::from("Image created.")))
-		}
+		},
+		
 		_ => {
 			Ok(Response::builder().status(StatusCode::METHOD_NOT_ALLOWED).body(Body::from("Method not allowed")).unwrap())
 		}
