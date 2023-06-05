@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::str;
 use std::time::Duration;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LogMessage {
     pub source: String,
     pub timestamp: DateTime<Utc>,
@@ -76,7 +76,7 @@ pub async fn get_logs(container_id: &str, filter: LogFilter, tx: broadcast::Send
 
                 let row = vec![
                     ("source".to_string(), Value::String(Arc::new(message.source.into_bytes()))),
-                    ("timestamp".to_string(), Value::DateTime(message.timestamp.timestamp() as u32, Utc)),
+                    ("timestamp".to_string(), Value::DateTime(message.timestamp.timestamp() as u32, chrono_tz::UTC)),
                     ("text".to_string(), Value::String(Arc::new(message.text.into_bytes()))),
                 ];
                 
@@ -85,7 +85,7 @@ pub async fn get_logs(container_id: &str, filter: LogFilter, tx: broadcast::Send
                 let mut client = pool.get_handle();
                 
                 let row_count = client
-                    .insert("INSERT INTO logs (source, timestamp, text) VALUES")
+                    .query("INSERT INTO logs (source, timestamp, text) VALUES", block)
                     .bind(block)
                     .execute()
                     .await?;

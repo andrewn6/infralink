@@ -1,26 +1,31 @@
+pub mod db;
+pub mod logs;
+
+
 use hyper::body::to_bytes;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, StatusCode, Method, Error};
 use hyper::Server;
+use reqwest::{Client, Url};
 
 use nixpacks::nixpacks::builder::docker::DockerBuilderOptions as NixpacksOptions;
 use nixpacks::nixpacks::plan::generator::GeneratePlanOptions;
 use nixpacks::nixpacks::plan::BuildPlan;
 use nixpacks::{create_docker_image, generate_build_plan};
 
-pub mod db;
-pub mod logs;
-
 use logs::logs::get_logs;
+use logs::logs::LogFilter;
+use logs::logs::LogMessage;
 use db::db::connection;
 use serde::{Deserialize};
 use dotenv_codegen::dotenv;
 use serde_json::json;
 
-use reqwest::Client;
 use colored::*;
+use std::error;
 use std::sync::{Arc};
-use chrono::Utc;
+use chrono::{Utc, DateTime};
+use tokio::sync::broadcast;
 use tokio::sync::Mutex;
 
 type SharedChild = Arc<Mutex<Option<BuildPlan>>>;
@@ -31,6 +36,13 @@ struct BuildInfo {
 	pub name: String,
 	pub envs: Vec<String>,
 	pub build_options: DockerBuilderOptions,
+}
+
+#[derive(Deserialize)]
+struct LogParams {
+	pub container_id: String,
+	pub start_time: DateTime<Utc>,
+	pub end_time: DateTime<Utc>,
 }
 
 #[derive(Deserialize, Clone, Default, Debug)]
@@ -166,6 +178,31 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 
 			Ok(Response::new(Body::from("Image created.")))
 		},
+		(&Method::GET, "/logs") => {
+			let url = Url::parse(&("http://localhost".to_string() + req.uri().path_and_query().map(|x| x.as_str()).unwrap_or(""))).unwrap();
+
+			let params: LogParams = match serde_urlencoded::from_str(url.query().unwrap_or("")) {
+				Ok(params) => params,
+				Err(_) => {
+					return Ok(Response::builder()
+					.status(StatusCode::BAD_REQUEST)
+					.body(Body::from("Invalid request paramaters"))
+					.unwrap());
+				}
+			};
+
+			let (tx, _) = broadcast::channel(100);
+			let filter = LogFilter { start_time: params.start_time, end_time: params.end_time };
+
+			tokio::spawn(async move {
+				if let Err(e) = get_logs(&params.container_id, filter, tx).await {
+					format!("Error getting logs: {}", e);
+				}
+			});
+			
+			Ok(Response::new(Body::from("Logs are being collected.")))
+
+		}
 		
 		_ => {
 			Ok(Response::builder().status(StatusCode::METHOD_NOT_ALLOWED).body(Body::from("Method not allowed")).unwrap())
