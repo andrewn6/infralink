@@ -3,13 +3,14 @@ use shiplift::LogsOptions;
 use tokio::sync::broadcast;
 
 use clickhouse_rs::Pool;
-use clickhouse_rs::types::{Block, Decimal, Value};
+use clickhouse_rs::types::{Block, Value};
 
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::config::ClientConfig;
 use rdkafka::util::Timeout;
 
 use chrono::prelude::*;
+use chrono_tz::Tz::UTC;
 use futures::StreamExt;
 use tracing::{error};
 
@@ -51,8 +52,6 @@ pub async fn get_logs(container_id: &str, filter: LogFilter, tx: broadcast::Send
         .set("message.timeout.ms", &duration_in_millis)
         .create()?;
 
-    let pool = Pool::new("tcp://clickhouse:9000");
-
     while let Some(log_result) = logs_stream.next().await {
         match log_result {
             Ok(log_output) => {
@@ -74,21 +73,23 @@ pub async fn get_logs(container_id: &str, filter: LogFilter, tx: broadcast::Send
 
                 let mut block = Block::new();
 
+                let dt: DateTime<Utc> = Utc::now();
+
                 let row = vec![
                     ("source".to_string(), Value::String(Arc::new(message.source.into_bytes()))),
-                    ("timestamp".to_string(), Value::DateTime(message.timestamp.timestamp() as u32, chrono_tz::UTC)),
+                    ("timestamp".to_string(), Value::DateTime(message.timestamp.timestamp() as u32, UTC)),
                     ("text".to_string(), Value::String(Arc::new(message.text.into_bytes()))),
                 ];
                 
                 block.push(row);
 
-                let mut client = pool.get_handle();
-                
-                let row_count = client
-                    .query("INSERT INTO logs (source, timestamp, text) VALUES", block)
-                    .bind(block)
-                    .execute()
-                    .await?;
+                let mut client = pool.get_handle().await?;
+            
+                let ddl = r"
+                INSERT INTO logs (source, timestamp, text) VALUES
+                ";
+
+                client.insert(ddl, block).await?;
             },
             Err(e) => {
                 error!("Error reading logs: {}", e);
