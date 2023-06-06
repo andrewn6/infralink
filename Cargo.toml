@@ -5,7 +5,8 @@ members = [
   "models",                 # Models used for network, cloud providers, metrics etc.
   "services/health-check",  # Codebase for health check
   "services/ping-server",   # Ping server
-  "services/registry",      # Docker registry service
+  "services/registry",  
+  "services/builder",    # Docker registry service
 ]
 
 [profile.release]
