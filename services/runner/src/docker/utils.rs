@@ -1,8 +1,7 @@
 use shiplift::tty::TtyChunk;
 use shiplift::{ContainerOptions, Docker, PullOptions, RmContainerOptions, LogsOptions};
 use shiplift::errors::Error;
-use std::env;
-use futures::{StreamExt, TryStreamExt};
+use futures::{StreamExt};
 
 pub struct DockerClient {
     client: Docker,
@@ -69,4 +68,10 @@ impl DockerClient {
         Ok(())
     }
 
+}
+
+impl Default for DockerClient {
+    fn default() -> Self {
+        Self::new()
+    }
 }
