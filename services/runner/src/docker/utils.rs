@@ -13,18 +13,6 @@ impl DockerClient {
             client: Docker::new(),
         }
     }
-
-    pub async fn pull_image(&self, image: &str) -> Result<(), Error> {
-        let options = PullOptions::builder().image(image).build();
-
-        let mut stream = self.client.images().pull(&options);
-
-        while let Some(pull_result) = stream.next().await {
-            pull_result?;
-        }
-        Ok(())
-    }
-
     pub async fn start_container(&self, image: &str) -> Result<String, Error> {
         let options = ContainerOptions::builder(image).build();
 

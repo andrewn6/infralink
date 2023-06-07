@@ -58,7 +58,7 @@ async fn run_server() {
 	let addr = ([127, 0, 0 ,1], 8085).into();
 	let server = Server::bind(&addr).serve(make_svc);
 
-	println!("Registry Server listening on {}", addr.to_string().bright_blue());
+	println!("Runner Server listening on {}", addr.to_string().bright_yellow());
 
 	if let Err(e) = server.await {
 		eprintln!("server error: {}", e);
