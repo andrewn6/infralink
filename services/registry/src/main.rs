@@ -1,16 +1,16 @@
 use hyper::body::to_bytes;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
-use governor::{Quota, RateLimiter};
 
 use serde::Deserialize;
 use shiplift::{Docker, PullOptions};
 use futures_util::StreamExt;
+use tokio::sync::Semaphore;
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::process::Command;
-use std::num::NonZeroU32;
+use std::sync::Arc;
 use colored::*;
 
 #[derive(Deserialize)]
@@ -22,20 +22,12 @@ struct ImageData {
 
 async fn handle_push(
 	mut req: Request<Body>,
-	docker: Docker,
+	docker: Arc<Docker>,
+	semaphore: Arc<Semaphore>,
 ) -> Result<Response<Body>, hyper::Error> {
-
-	let limiter = RateLimiter::direct(Quota::per_second(NonZeroU32::new(1).unwrap()));
-
-	if limiter.check().is_err() {
-		return Ok(Response::builder()
-			.status(StatusCode::TOO_MANY_REQUESTS)
-			.body(Body::from("Too many requests, you are being rate limited."))
-			.unwrap());
-	}
+	let permit = semaphore.acquire().await.unwrap();
 
 	let whole_body = to_bytes(req.body_mut()).await?;
-
 	let image_data: Result<ImageData, _> = serde_json::from_slice(&whole_body);
 
 	let image_data = match image_data {
@@ -85,6 +77,8 @@ async fn handle_push(
 		.output()
 		.expect("Failed to execute process");
 
+	drop(permit);
+
 	if output.status.success() {
 		Ok(Response::new(Body::from("Image pushed successfully!")))
 	} else {
@@ -99,7 +93,8 @@ async fn handle_push(
 
 async fn handle_pull(
 	mut req: Request<Body>,
-	docker: Docker,
+	docker: Arc<Docker>,
+	semaphore: Arc<Semaphore>,
 ) -> Result<Response<Body>, hyper::Error> {
 	let whole_body = to_bytes(req.body_mut()).await?;
 
@@ -142,11 +137,12 @@ async fn handle_pull(
 
 async fn handle_request(
 	req: Request<Body>,
-	docker: Docker,
+	docker: Arc<Docker>,
+	semaphore: tokio::sync::Semaphore,
 ) -> Result<Response<Body>, hyper::Error> {
 	match (req.method(), req.uri().path()) {
-		(&Method::POST, "/push") => handle_push(req, docker).await,
-		(&Method::GET, "/pull") => handle_pull(req, docker).await,
+		(&Method::POST, "/push") => handle_push(req, docker, semaphore.into()).await,
+		(&Method::GET, "/pull") => handle_pull(req, docker, semaphore.into()).await,
 		_ => Ok(Response::builder()
 			.status(StatusCode::NOT_FOUND)
 			.body(Body::empty())
@@ -162,13 +158,15 @@ fn service_fn_wrapper(docker: Docker) -> impl Fn(Request<Body>) -> futures_util:
 
 #[tokio::main]
 async fn main() {
-	let docker = Docker::new();
+	let docker = Arc::new(Docker::new());
+	let semaphore = Arc::new(Semaphore::new(2));
 
 	let addr: SocketAddr = ([127, 0, 0, 1], 8083).into();
 
 	let make_svc = make_service_fn(move |_conn| {
 		let docker = docker.clone();
-		async move { Ok::<_, Infallible>(service_fn(move |req| handle_request(req, docker.clone()))) }
+		let semaphore = semaphore.clone();
+		async move { Ok::<_, Infallible>(service_fn(move |req| handle_request(req, docker.clone(), semaphore.clone()))) }
 	});
 
 	let server = Server::bind(&addr).serve(make_svc);
