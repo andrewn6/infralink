@@ -6,6 +6,7 @@ use hyper::client::Client;
 
 use std::convert::Infallible;
 use std::str;
+use std::time::Duration;
 use colored::*;
 
 pub mod docker;
@@ -13,7 +14,7 @@ use docker::utils::DockerClient;
 
 async fn handle_run(image: String) -> Result<hyper::Body, hyper::Error> {
 	let registry_service_url = "http://localhost:8083/pull";
-
+ 
 	let client = Client::new();
 
 	let req = Request::post(registry_service_url)
@@ -39,13 +40,49 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
 			let full_body = to_bytes(body).await.unwrap();
 			let image = str::from_utf8(&full_body).unwrap().to_string();
 			match handle_run(image.to_string()).await {
-				Ok(container_id) => Response::new(container_id),
-				Err(_) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from("Failed to start container")).unwrap(),
+				Ok(container_id) => {
+					let container_id_str = String::from_utf8_lossy(&container_id).to_string();
+					let docker_client = DockerClient::new();
+					tokio::spawn(async move {
+						tokio::time::sleep(Duration::from_secs(60)).await;
+						docker_client.stop_container(&container_id_str).await.unwrap();
+					});
+					Response::new(container_id)
+				},
+				Err(e) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from(format!("Error: {}", e))).unwrap(),
 			}
 		}
-		_ => Response::builder().status(StatusCode::NOT_FOUND).body(Body::empty()).unwrap(),
-	};
+		(Method::GET, "/status") => {
+			let container_id = parts.uri.query().unwrap_or("");
+			let docker_client = DockerClient::new();
 
+			match docker_client.get_container_status(container_id).await {
+				Ok(details) => {
+					let status = format!("Container Status: {:?}", details.state.status);
+					Response::new(Body::from(status))
+				},
+				Err(_) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from("Error getting container status")).unwrap(),
+			}
+		}
+		(Method::POST, "/stop") => {
+			let full_body = to_bytes(body).await.unwrap();
+			let container_id = String::from_utf8_lossy(&full_body).to_string();
+			let docker_client = DockerClient::new();
+			match docker_client.stop_container(&container_id).await {
+				Ok(_) => Response::new(Body::from("Successfully stopped container")),
+				Err(_) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from("Error stopping run")).unwrap(),
+			}
+		}
+		(Method::GET, "/logs") => {
+			let container_id = parts.uri.query().unwrap_or("");
+			let docker_client = DockerClient::new();
+			match docker_client.stream_logs(container_id).await {
+				Ok(logs) => Response::new(Body::from("Streaming logs..")),
+				Err(_) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from("Error getting logs")).unwrap(),
+			}
+		}
+		_ => Response::builder().status(StatusCode::NOT_FOUND).body(Body::from("Not Found")).unwrap(),
+	};
 	Ok(response)
 }
 
