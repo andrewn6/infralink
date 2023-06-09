@@ -13,7 +13,4 @@ shiplift = "0.7.0"
 futures-util = "0.3.28"
 serde = { version = "1.0"}
 serde_json = "1.0.96"
-tower = "0.4.13"
-tower-service = "0.3.2"
 colored = "2.0.0"
-governor = "0.5.1"
