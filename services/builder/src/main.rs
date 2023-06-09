@@ -145,7 +145,6 @@ async fn handle(req: Request<Body>, child_handle: SharedChild) -> Result<Respons
 				Ok(_) => {
 					let client = Client::new();
 					let registry_post_data = json!({
-						"registry_url": dotenv!("DOCKER_REGISTRY_URL"),
 						"image_name": build_info.name,
 						"image_tag": build_info.build_options.tags.get(0).unwrap_or(&"latest".to_string())
 					});
