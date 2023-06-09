@@ -15,7 +15,6 @@ use colored::*;
 
 #[derive(Deserialize)]
 struct ImageData {
-	registry_url: String,
 	image_name: String,
 	image_tag: String,
 }
@@ -56,10 +55,12 @@ async fn handle_push(
 			.unwrap());
 	}
 
-	// Update this to not be hard coded
+	// Update accordingly 
+	let registry_url = "registry.mach.dev";
+
 	let image = format!(
 		"{}/{}:{}",
-		image_data.registry_url, image_data.image_name, image_data.image_tag
+		registry_url, image_data.image_name, image_data.image_tag
 	);
 	let pull_options = PullOptions::builder().image(&image).build();
 	let mut stream = docker.images().pull(&pull_options);
@@ -94,7 +95,7 @@ async fn handle_push(
 async fn handle_pull(
 	mut req: Request<Body>,
 	docker: Arc<Docker>,
-	semaphore: Arc<Semaphore>,
+	_semaphore: Arc<Semaphore>,
 ) -> Result<Response<Body>, hyper::Error> {
 	let whole_body = to_bytes(req.body_mut()).await?;
 
@@ -118,9 +119,11 @@ async fn handle_pull(
 			.unwrap());
 	}
 
+	let registry_url = "registry.mach.dev";
+
 	let image = format!(
 		"{}/{}:{}",
-		image_data.registry_url, image_data.image_name, image_data.image_tag
+		registry_url, image_data.image_name, image_data.image_tag
 	);
 	let pull_options = shiplift::PullOptions::builder().image(&image).build();
 	let mut stream = docker.images().pull(&pull_options);
