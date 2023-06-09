@@ -1,5 +1,5 @@
 use shiplift::tty::TtyChunk;
-use shiplift::{ContainerOptions, Docker, PullOptions, RmContainerOptions, LogsOptions};
+use shiplift::{ContainerOptions, Docker, RmContainerOptions, LogsOptions};
 use shiplift::errors::Error;
 use futures::{StreamExt};
 
