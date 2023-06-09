@@ -84,16 +84,26 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
 				Err(_) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from("Error stopping run")).unwrap(),
 			}
 		}
+		_ => Response::builder().status(StatusCode::NOT_FOUND).body(Body::from("Not Found")).unwrap(),
+		/* Needs a fix... 
 		(Method::GET, "/logs") => {
 			let container_id = parts.uri.query().unwrap_or("");
 			let docker_client = DockerClient::new();
 			match docker_client.stream_logs(container_id).await {
-				Ok(logs) => Response::new(Body::from("Streaming logs..")),
-				Err(_) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from("Error getting logs")).unwrap(),
+				Ok(logs) => {
+					let logs_vec = logs;
+					let logs_body: hyper::Body = Body::from(logs);
+					Response::new(logs_body)
+				},
+				Err(_) => Response::builder()
+					.status(StatusCode::INTERNAL_SERVER_ERROR)
+					.body(Body::from("Error getting logs"))
+					.unwrap(),
 			}
 		}
-		_ => Response::builder().status(StatusCode::NOT_FOUND).body(Body::from("Not Found")).unwrap(),
+		*/
 	};
+	
 	Ok(response)
 }
 
