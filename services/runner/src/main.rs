@@ -41,13 +41,24 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
 			let image = str::from_utf8(&full_body).unwrap().to_string();
 			match handle_run(image.to_string()).await {
 				Ok(container_id) => {
-					let container_id_str = String::from_utf8_lossy(&container_id).to_string();
+					let container_id_bytes = hyper::body::to_bytes(container_id)
+						.await
+						.unwrap()
+						.to_vec();
+
+					let container_id_str = String::from_utf8_lossy(&container_id_bytes).to_string();
 					let docker_client = DockerClient::new();
+
+					let response_container_id = container_id_str.clone();
+
 					tokio::spawn(async move {
 						tokio::time::sleep(Duration::from_secs(60)).await;
-						docker_client.stop_container(&container_id_str).await.unwrap();
+						docker_client.stop_container(&response_container_id).await.unwrap();
 					});
-					Response::new(container_id)
+
+					let response_body = hyper::Body::from(container_id_str);
+
+					Response::new(response_body)
 				},
 				Err(e) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from(format!("Error: {}", e))).unwrap(),
 			}
