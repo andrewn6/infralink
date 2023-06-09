@@ -138,11 +138,11 @@ async fn handle_pull(
 async fn handle_request(
 	req: Request<Body>,
 	docker: Arc<Docker>,
-	semaphore: tokio::sync::Semaphore,
+	semaphore: Arc<tokio::sync::Semaphore>,
 ) -> Result<Response<Body>, hyper::Error> {
 	match (req.method(), req.uri().path()) {
-		(&Method::POST, "/push") => handle_push(req, docker, semaphore.into()).await,
-		(&Method::GET, "/pull") => handle_pull(req, docker, semaphore.into()).await,
+		(&Method::POST, "/push") => handle_push(req, docker, semaphore).await,
+		(&Method::GET, "/pull") => handle_pull(req, docker, semaphore).await,
 		_ => Ok(Response::builder()
 			.status(StatusCode::NOT_FOUND)
 			.body(Body::empty())
