@@ -4,6 +4,8 @@ WORKDIR /usr/src/health-check
 
 COPY . .
 
+COPY ../../models /usr/src/health-check/models
+
 RUN cargo build --release
 
 FROM debian:bullseye-slim

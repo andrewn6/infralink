@@ -13,7 +13,7 @@ pub mod docker;
 use docker::utils::DockerClient;
 
 async fn handle_run(image: String) -> Result<hyper::Body, hyper::Error> {
-	let registry_service_url = "http://localhost:8083/pull";
+	let registry_service_url = "docker.io/v2/library";
  
 	let client = Client::new();
 
