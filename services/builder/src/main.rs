@@ -15,14 +15,11 @@ use nixpacks::{create_docker_image, generate_build_plan};
 
 use logs::logs::get_logs;
 use logs::logs::LogFilter;
-use logs::logs::LogMessage;
 use db::db::connection;
 use serde::{Deserialize};
-use dotenv_codegen::dotenv;
 use serde_json::json;
 
 use colored::*;
-use std::error;
 use std::sync::{Arc};
 use chrono::{Utc, DateTime};
 use tokio::sync::broadcast;
