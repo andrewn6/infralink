@@ -1,32 +1,60 @@
-use reqwest::Client;
+use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharedConfig {
-	pub clients: ProviderClients,
+    pub region: String,
+    pub api_token: String,
+    pub api_url: String,
+    pub clients: ClientsConfig,
 }
 
-pub struct ProviderClients {
-	pub vultr: Option<Client>,
-	pub hetzner: Option<Client>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientsConfig {
+    inner: HashMap<String, ClientConfig>,
 }
 
-impl ProviderClients {
-	pub fn vultr(mut self) -> Client {
-		if self.vultr.is_none() {
-			self.vultr = Some(Client::builder().use_rustls_tls().build().unwrap());
+impl ClientsConfig {
+    pub fn new() -> Self {
+        let mut inner = HashMap::new();
+        inner.insert("http".to_string(), ClientConfig {
+            timeout: 30,
+            retries: 3,
+        });
+        Self { inner }
+    }
 
-			self.vultr.unwrap()
-		} else {
-			self.vultr.unwrap()
-		}
-	}
+    pub fn vultr(&self) -> &ClientConfig {
+        self.inner.get("vultr").unwrap_or(&ClientConfig::default())
+    }
 
-	pub fn hetzner(mut self) -> Client {
-		if self.hetzner.is_none() {
-			self.hetzner = Some(Client::builder().use_rustls_tls().build().unwrap());
+    pub fn hetzner(&self) -> &ClientConfig {
+        self.inner.get("hetzner").unwrap_or(&ClientConfig::default())
+    }
+}
 
-			self.hetzner.unwrap()
-		} else {
-			self.hetzner.unwrap()
-		}
-	}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientConfig {
+    pub timeout: u64,
+    pub retries: u32,
+}
+
+impl Default for ClientConfig {
+    fn default() -> Self {
+        Self {
+            timeout: 30,
+            retries: 3,
+        }
+    }
+}
+
+impl Default for SharedConfig {
+    fn default() -> Self {
+        Self {
+            region: "us-east-1".to_string(),
+            api_token: "dummy_token".to_string(),
+            api_url: "https://api.example.com".to_string(),
+            clients: ClientsConfig::new(),
+        }
+    }
 }
