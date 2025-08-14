@@ -10,7 +10,7 @@ use rdkafka::config::ClientConfig;
 use rdkafka::util::Timeout;
 
 use chrono::prelude::*;
-use chrono_tz::Tz::UTC;
+use chrono_tz::UTC;
 use futures::StreamExt;
 use tracing::{error};
 
@@ -66,7 +66,8 @@ pub async fn get_logs(container_id: &str, filter: LogFilter, tx: broadcast::Send
                 };
                 if filter.matches(&message) {
                     let topic = "logs_topic";
-                    let record = FutureRecord::to(topic).payload(&format!("{:?}", message)).key("");
+                    let payload = format!("{:?}", message);
+                    let record = FutureRecord::to(topic).payload(&payload).key("");
 
                     producer.send(record, Timeout::Never).await;
                 }
