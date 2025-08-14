@@ -1,0 +1,16 @@
+pub mod api;
+pub mod pods;
+pub mod services;
+pub mod deployments;
+pub mod configmaps;
+pub mod secrets;
+pub mod volumes;
+pub mod ingress;
+pub mod autoscaling;
+pub mod nodes;
+pub mod namespaces;
+pub mod events;
+pub mod metrics;
+pub mod health;
+pub mod docs;
+pub mod watch;

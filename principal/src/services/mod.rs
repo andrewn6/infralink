@@ -5,3 +5,5 @@ pub mod ingress;
 pub mod proxy;
 pub mod storage;
 pub mod volume_scheduler;
+pub mod autoscaler;
+pub mod metrics;
