@@ -3,3 +3,5 @@ pub mod load_balancer;
 pub mod config;
 pub mod ingress;
 pub mod proxy;
+pub mod storage;
+pub mod volume_scheduler;
