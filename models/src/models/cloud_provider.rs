@@ -6,4 +6,6 @@ pub enum CloudProvider {
 	Hetzner,
 	Oracle,
 	HostHatch,
+	Fly,
+	Local,
 }
