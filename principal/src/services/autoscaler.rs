@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tokio::time::{interval, Duration, Instant};
+use tokio::time::{interval, Duration};
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-use crate::scale::scale::{Pod, Service, Deployment, Node};
 
 /// Comprehensive autoscaling system for pods, deployments, and cluster nodes
 #[derive(Clone)]
@@ -688,7 +687,7 @@ impl HorizontalPodAutoscaler {
     }
 
     /// Collect resource metrics (CPU, memory) for a target
-    async fn collect_resource_metric(&self, resource_name: &str, hpa_spec: &HpaSpec) -> Result<f64, AutoscalerError> {
+    async fn collect_resource_metric(&self, resource_name: &str, _hpa_spec: &HpaSpec) -> Result<f64, AutoscalerError> {
         // Mock metric collection - in reality this would query metrics from pods
         match resource_name {
             "cpu" => {
@@ -905,7 +904,7 @@ impl VerticalPodAutoscaler {
     }
 
     /// Generate resource recommendations for a VPA target
-    async fn generate_recommendations(&self, vpa_spec: &VpaSpec) -> Result<VpaRecommendation, AutoscalerError> {
+    async fn generate_recommendations(&self, _vpa_spec: &VpaSpec) -> Result<VpaRecommendation, AutoscalerError> {
         // Mock recommendation generation - in reality this would analyze historical metrics
         let container_recommendations = vec![
             VpaContainerRecommendation {
@@ -943,7 +942,7 @@ impl VerticalPodAutoscaler {
     }
 
     /// Apply VPA recommendations to the target
-    async fn apply_recommendations(&self, vpa_spec: &VpaSpec, recommendation: &VpaRecommendation) -> Result<(), AutoscalerError> {
+    async fn apply_recommendations(&self, _vpa_spec: &VpaSpec, recommendation: &VpaRecommendation) -> Result<(), AutoscalerError> {
         for container_rec in &recommendation.container_recommendations {
             println!("Applying VPA recommendations for container {}: CPU={}, Memory={}", 
                      container_rec.container_name,
@@ -1059,45 +1058,63 @@ impl ClusterAutoscaler {
 
     /// Scale a node group to the desired size
     async fn scale_node_group(&self, node_group_id: &str, desired_nodes: i32, activity_type: ClusterScalingActivityType) -> Result<(), AutoscalerError> {
-        let mut node_groups = self.node_groups.lock().unwrap();
+        let old_size;
+        let node_group_name;
         
-        if let Some(node_group) = node_groups.get_mut(node_group_id) {
-            let old_size = node_group.status.total_nodes;
-            node_group.status.total_nodes = desired_nodes;
-            node_group.status.last_scale_time = Some(Utc::now());
+        {
+            let mut node_groups = self.node_groups.lock().unwrap();
+            
+            if let Some(node_group) = node_groups.get_mut(node_group_id) {
+                old_size = node_group.status.total_nodes;
+                node_group.status.total_nodes = desired_nodes;
+                node_group.status.last_scale_time = Some(Utc::now());
+                node_group_name = node_group.name.clone();
+            } else {
+                return Err(AutoscalerError::ValidationError("Node group not found".to_string()));
+            }
+        }
 
-            // Record scaling activity
-            let activity = ClusterScalingActivity {
-                id: Uuid::new_v4().to_string(),
-                activity_type,
-                node_group_name: node_group.name.clone(),
-                description: format!("Scaling from {} to {} nodes", old_size, desired_nodes),
-                cause: "ResourceDemand".to_string(),
-                start_time: Utc::now(),
-                end_time: None,
-                status_code: ClusterScalingActivityStatus::InProgress,
-                status_message: "Scaling in progress".to_string(),
-                details: HashMap::new(),
-            };
+        // Record scaling activity
+        let activity = ClusterScalingActivity {
+            id: Uuid::new_v4().to_string(),
+            activity_type,
+            node_group_name: node_group_name.clone(),
+            description: format!("Scaling from {} to {} nodes", old_size, desired_nodes),
+            cause: "ResourceDemand".to_string(),
+            start_time: Utc::now(),
+            end_time: None,
+            status_code: ClusterScalingActivityStatus::InProgress,
+            status_message: "Scaling in progress".to_string(),
+            details: HashMap::new(),
+        };
 
+        {
             let mut activities = self.scaling_activities.lock().unwrap();
             activities.push(activity);
+        }
 
-            println!("Scaling node group {} from {} to {} nodes", 
-                     node_group.name, old_size, desired_nodes);
+        println!("Scaling node group {} from {} to {} nodes", 
+                 node_group_name, old_size, desired_nodes);
 
-            // Mock scaling delay
-            tokio::time::sleep(Duration::from_millis(200)).await;
+        // Mock scaling delay
+        tokio::time::sleep(Duration::from_millis(200)).await;
 
-            // Update to successful
+        // Update to successful
+        {
+            let mut activities = self.scaling_activities.lock().unwrap();
             if let Some(last_activity) = activities.last_mut() {
                 last_activity.end_time = Some(Utc::now());
                 last_activity.status_code = ClusterScalingActivityStatus::Successful;
                 last_activity.status_message = "Scaling completed successfully".to_string();
             }
+        }
 
-            // Update ready nodes (mock - assume all nodes become ready)
-            node_group.status.ready_nodes = desired_nodes;
+        // Update ready nodes (mock - assume all nodes become ready)
+        {
+            let mut node_groups = self.node_groups.lock().unwrap();
+            if let Some(node_group) = node_groups.get_mut(node_group_id) {
+                node_group.status.ready_nodes = desired_nodes;
+            }
         }
 
         Ok(())
@@ -1135,6 +1152,8 @@ pub enum AutoscalerError {
     MetricCollectionFailed(String),
     #[error("Scaling operation failed: {0}")]
     ScalingFailed(String),
+    #[error("Validation error: {0}")]
+    ValidationError(String),
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(String),
     #[error("Target not found: {0}")]

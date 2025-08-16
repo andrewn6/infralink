@@ -18,7 +18,7 @@ pub async fn run_autoscaling_example() -> Result<(), Box<dyn std::error::Error>>
         node_metrics_enabled: true,
         pod_metrics_enabled: true,
         custom_metrics_enabled: true,
-        ..Default::default()
+        ..crate::services::metrics::MetricsConfig::default()
     };
     
     let metrics_collector = MetricsCollector::new(metrics_config).await?;
@@ -32,7 +32,7 @@ pub async fn run_autoscaling_example() -> Result<(), Box<dyn std::error::Error>>
         cluster_sync_interval: Duration::from_secs(20),
         scale_up_threshold: 0.7,
         scale_down_threshold: 0.3,
-        ..Default::default()
+        ..crate::services::autoscaler::AutoscalerConfig::default()
     };
 
     let autoscaler = AutoscalerManager::new(autoscaler_config);
@@ -317,7 +317,7 @@ async fn demo_cluster_autoscaling(autoscaler: &AutoscalerManager) -> Result<(), 
     let activities = autoscaler.cluster_autoscaler.scaling_activities.lock().unwrap();
     println!("   Cluster scaling activities: {}", activities.len());
     for activity in activities.iter().take(3) {
-        println!("     {} {}: {} - {:?}", 
+        println!("     {:?} {}: {} - {:?}", 
                  activity.activity_type, 
                  activity.node_group_name,
                  activity.description,
@@ -511,7 +511,7 @@ async fn show_autoscaling_statistics(
     if !scaling_history.is_empty() {
         println!("\n🎯 Recent Scaling Events:");
         for event in scaling_history.iter().rev().take(5) {
-            println!("   {} {} {}: {} → {} replicas ({})", 
+            println!("   {} {:?} {}: {} → {} replicas ({})", 
                      event.timestamp.format("%H:%M:%S"),
                      event.event_type,
                      event.target_ref.name,

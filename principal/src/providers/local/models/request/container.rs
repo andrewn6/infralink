@@ -131,7 +131,7 @@ impl LocalContainer {
         let container_infos = docker_client.list_containers(true).await
             .map_err(|e| ContainerError::OperationFailed(e.to_string()))?;
         
-        let containers = container_infos.into_iter()
+        let containers: Vec<LocalContainer> = container_infos.into_iter()
             .map(convert_from_docker_info)
             .collect();
         
@@ -167,7 +167,7 @@ impl LocalContainer {
         let lines = if follow {
             None // Follow mode doesn't use line limit
         } else {
-            tail.and_then(|t| t.parse().ok())
+            tail.as_ref().and_then(|t| t.parse().ok())
         };
         
         let logs = docker_client.get_container_logs(container_id, lines).await

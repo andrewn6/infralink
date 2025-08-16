@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tokio::time::{interval, Duration, Instant};
+use tokio::time::{interval, Duration};
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 
-use crate::scale::scale::{Pod, Node};
 use crate::providers::local::docker_client::{DockerClient, ContainerStats};
 
 /// Metrics collection system for autoscaling and monitoring

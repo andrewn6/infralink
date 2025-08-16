@@ -553,7 +553,7 @@ impl PersistentVolumeManager {
         }
     }
 
-    fn provision_local_volume(&self, provider: &LocalStorageProvider, spec: &PersistentVolumeSpec) -> Result<(), StorageError> {
+    fn provision_local_volume(&self, _provider: &LocalStorageProvider, spec: &PersistentVolumeSpec) -> Result<(), StorageError> {
         if let VolumeSource::Local { path } = &spec.volume_source {
             // Create directory if it doesn't exist
             std::fs::create_dir_all(path)

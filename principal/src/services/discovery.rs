@@ -151,7 +151,7 @@ impl ServiceDiscovery {
         service_name: String,
         ip: String,
         port: u16,
-        metadata: HashMap<String, String>,
+        _metadata: HashMap<String, String>,
     ) {
         let endpoint = Endpoint {
             pod_id: format!("pod-{}", uuid::Uuid::new_v4()),

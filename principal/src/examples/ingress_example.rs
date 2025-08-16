@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use crate::services::ingress::*;
-use crate::services::proxy::{IngressProxy, ProxyConfig};
+use crate::services::proxy::IngressProxy;
 use crate::services::discovery::ServiceDiscovery;
 
 /// Example of setting up ingress rules and running the proxy server
@@ -20,7 +20,7 @@ pub async fn run_ingress_example() -> Result<(), Box<dyn std::error::Error>> {
     let service_discovery = Arc::new(service_discovery);
 
     // Create and start the proxy server
-    let proxy = IngressProxy::new(
+    let _proxy = IngressProxy::new(
         ingress_controller.clone(),
         service_discovery.clone(),
         8080,
